@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Desktop Island — Dev v4 · Co-pilot Edition</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      background: #0d1117; overflow: hidden;
+      height: 100vh; width: 100vw; user-select: none;
+    }
+
+    /* ── Menubar ── */
+    .menubar {
+      position: absolute; top: 0; left: 0; right: 0; height: 28px;
+      background: rgba(10,12,18,.98); backdrop-filter: blur(20px);
+      display: flex; align-items: center; padding: 0 16px; gap: 20px;
+      z-index: 100; border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    .mb-apple { font-size: 13px; color: rgba(255,255,255,.8); }
+    .mb-item { font-size: 13px; color: rgba(255,255,255,.4); font-weight: 500; }
+    .mb-right { margin-left: auto; display: flex; gap: 16px; align-items: center; }
+    .mb-r { font-size: 11px; color: rgba(255,255,255,.3); font-family: 'SF Mono', monospace; }
+
+    /* ── Left panel — lifecycle ── */
+    .lifecycle-panel {
+      position: absolute; left: 0; top: 28px; bottom: 0; width: 256px;
+      background: rgba(10,12,18,.98); border-right: 1px solid rgba(255,255,255,.05);
+      padding: 18px 14px; overflow-y: auto; z-index: 50;
+    }
+    .lifecycle-panel::-webkit-scrollbar { width: 3px; }
+    .lifecycle-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,.07); border-radius: 2px; }
+
+    .lc-title { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .8px; color: rgba(255,255,255,.18); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.05); }
+
+    .phase {
+      position: relative;
+      margin-bottom: 0;
+    }
+
+    .phase-connector {
+      width: 1px; height: 20px;
+      background: rgba(255,255,255,.06);
+      margin-left: 11px;
+    }
+
+    .phase-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .phase-dot {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; flex-shrink: 0;
+      border: 1.5px solid;
+    }
+    .phase-dot.pre  { border-color: rgba(96,165,250,.4); background: rgba(96,165,250,.08); color: #60a5fa; }
+    .phase-dot.mid  { border-color: rgba(110,216,127,.35); background: rgba(110,216,127,.07); color: #6ed87f; }
+    .phase-dot.post { border-color: rgba(210,168,255,.35); background: rgba(210,168,255,.07); color: #d2a8ff; }
+    .phase-dot.resume { border-color: rgba(255,255,255,.15); background: rgba(255,255,255,.04); color: rgba(255,255,255,.4); }
+
+    .phase-name { font-size: 11px; font-weight: 700; }
+    .phase-name.pre    { color: rgba(96,165,250,.75); }
+    .phase-name.mid    { color: rgba(110,216,127,.75); }
+    .phase-name.post   { color: rgba(210,168,255,.75); }
+    .phase-name.resume { color: rgba(255,255,255,.35); }
+
+    .phase-tag { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 1px 6px; border-radius: 20px; margin-left: auto; }
+    .tag-new { background: rgba(210,168,255,.12); color: rgba(210,168,255,.6); }
+    .tag-v3  { background: rgba(255,255,255,.06); color: rgba(255,255,255,.25); }
+
+    .phase-signals {
+      padding-left: 30px; margin-bottom: 4px;
+    }
+    .phase-signal {
+      font-size: 10px; color: rgba(255,255,255,.3); line-height: 1.8;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .sig-ic { font-size: 9px; }
+
+    .phase-desc {
+      padding-left: 30px; margin-top: 4px; margin-bottom: 2px;
+      font-size: 10px; color: rgba(255,255,255,.22); line-height: 1.55;
+    }
+
+    .phase-divider { height: 1px; background: rgba(255,255,255,.04); margin: 14px 0 14px 30px; }
+
+    /* ── Editor ── */
+    .editor-area {
+      position: absolute; left: 256px; right: 0; top: 28px; bottom: 0;
+      display: flex; flex-direction: column;
+    }
+    .tabs-bar {
+      height: 34px; background: #161b22;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      display: flex; align-items: flex-end; padding: 0 8px;
+    }
+    .tab { height: 30px; padding: 0 14px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(255,255,255,.35); border-right: 1px solid rgba(255,255,255,.04); }
+    .tab.active { background: #0d1117; color: rgba(255,255,255,.7); }
+    .tab-m { width: 6px; height: 6px; border-radius: 50%; background: #e2c97e; }
+
+    .code-body { flex: 1; padding: 14px 0; overflow: hidden; }
+    .cl { display: flex; font-family: 'SF Mono','Menlo',monospace; font-size: 12px; line-height: 1.85; padding: 0 16px 0 48px; position: relative; }
+    .ln { position: absolute; left: 0; width: 40px; text-align: right; color: rgba(255,255,255,.14); font-size: 11px; padding-right: 10px; }
+    .cl.hl { background: rgba(255,255,255,.025); }
+    .kw{color:#ff7b72} .fn{color:#d2a8ff} .str{color:#a5d6ff} .cm{color:rgba(255,255,255,.18)} .tp{color:#79c0ff} .op{color:rgba(255,255,255,.4)} .pl{color:#ffa657}
+
+    /* ════════════════════════════════
+       ISLAND v4 — CO-PILOT EDITION
+    ════════════════════════════════ */
+    .island-wrap {
+      position: absolute; top: 36px;
+      left: calc(256px + 50%); transform: translateX(-50%);
+      z-index: 1000;
+    }
+
+    .island {
+      position: relative;
+      background: rgba(10,12,18,.96);
+      backdrop-filter: blur(40px) saturate(180%);
+      border-radius: 22px;
+      border: 1.5px solid rgba(255,255,255,.07);
+      box-shadow: 0 8px 40px rgba(0,0,0,.75);
+      min-width: 500px; max-width: 600px;
+      transition: all .35s cubic-bezier(.34,1.56,.64,1);
+    }
+
+    /* States */
+    .island.s-plan   { border-color: rgba(96,165,250,.3); box-shadow: 0 8px 40px rgba(0,0,0,.75), 0 0 24px rgba(96,165,250,.08); }
+    .island.s-go     { border-color: rgba(110,216,127,.28); box-shadow: 0 8px 40px rgba(0,0,0,.75), 0 0 24px rgba(110,216,127,.08); }
+    .island.s-wait   { border-color: rgba(251,191,36,.35); box-shadow: 0 8px 40px rgba(0,0,0,.75), 0 0 20px rgba(251,191,36,.1); }
+    .island.s-scope  { border-color: rgba(251,191,36,.4); box-shadow: 0 8px 40px rgba(0,0,0,.75), 0 0 20px rgba(251,191,36,.12); }
+    .island.s-error  { border-color: rgba(255,123,114,.45); box-shadow: 0 8px 40px rgba(0,0,0,.75), 0 0 28px rgba(255,123,114,.15); }
+    .island.s-review { border-color: rgba(210,168,255,.4); box-shadow: 0 8px 40px rgba(0,0,0,.75), 0 0 32px rgba(210,168,255,.12); }
+    .island.s-resume { border-color: rgba(255,255,255,.1); box-shadow: 0 8px 30px rgba(0,0,0,.6); }
+
+    /* ── Main row ── */
+    .main-row {
+      display: flex; align-items: center;
+      min-height: 48px; padding: 0 8px; gap: 4px;
+    }
+
+    /* Signal pill */
+    .sig-pill { display: flex; align-items: center; gap: 6px; padding: 4px 11px 4px 8px; border-radius: 13px; flex-shrink: 0; transition: all .3s; }
+    .sig-pill.plan   { background: rgba(96,165,250,.1); }
+    .sig-pill.go     { background: rgba(110,216,127,.1); }
+    .sig-pill.wait   { background: rgba(251,191,36,.1); }
+    .sig-pill.scope  { background: rgba(251,191,36,.1); }
+    .sig-pill.error  { background: rgba(255,123,114,.1); }
+    .sig-pill.review { background: rgba(210,168,255,.1); }
+    .sig-pill.resume { background: rgba(255,255,255,.05); }
+
+    .sig-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .sig-dot.plan   { background: #60a5fa; animation: p-blue 3s infinite; }
+    .sig-dot.go     { background: #6ed87f; animation: p-go 2.5s infinite; }
+    .sig-dot.wait   { background: #fbbf24; animation: p-amb 1.8s infinite; }
+    .sig-dot.scope  { background: #fbbf24; animation: p-amb 1.8s infinite; }
+    .sig-dot.error  { background: #ff7b72; animation: p-red 1.4s infinite; }
+    .sig-dot.review { background: #d2a8ff; }
+    .sig-dot.resume { background: rgba(255,255,255,.3); }
+
+    @keyframes p-blue { 0%,100%{box-shadow:0 0 0 0 rgba(96,165,250,.5)} 50%{box-shadow:0 0 0 5px rgba(96,165,250,0)} }
+    @keyframes p-go   { 0%,100%{box-shadow:0 0 0 0 rgba(110,216,127,.5)} 50%{box-shadow:0 0 0 5px rgba(110,216,127,0)} }
+    @keyframes p-amb  { 0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.5)}  50%{box-shadow:0 0 0 5px rgba(251,191,36,0)} }
+    @keyframes p-red  { 0%,100%{box-shadow:0 0 0 0 rgba(255,123,114,.6)} 50%{box-shadow:0 0 0 6px rgba(255,123,114,0)} }
+
+    .sig-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
+    .sig-label.plan   { color: rgba(96,165,250,.85); }
+    .sig-label.go     { color: rgba(110,216,127,.85); }
+    .sig-label.wait   { color: rgba(251,191,36,.85); }
+    .sig-label.scope  { color: rgba(251,191,36,.85); }
+    .sig-label.error  { color: rgba(255,123,114,.85); }
+    .sig-label.review { color: rgba(210,168,255,.9); }
+    .sig-label.resume { color: rgba(255,255,255,.35); }
+
+    /* Session label */
+    .sess-label {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 9px; border-radius: 10px;
+      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06);
+      flex-shrink: 0; margin: 0 5px;
+    }
+    .a-logo { width: 17px; height: 17px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; }
+    .logo-c { background: linear-gradient(135deg,#cc785c,#d4956a); color:#fff; }
+    .sess-repo { font-size: 11px; font-weight: 700; color: rgba(255,255,255,.5); font-family: 'SF Mono', monospace; }
+
+    /* Current action */
+    .cur-act { flex: 1; display: flex; align-items: center; gap: 7px; padding: 4px 8px; border-radius: 10px; transition: background .15s; cursor: pointer; min-width: 0; }
+    .cur-act:hover { background: rgba(255,255,255,.04); }
+    .act-v { font-size: 10px; font-family: 'SF Mono', monospace; color: rgba(255,255,255,.28); flex-shrink: 0; }
+    .act-f { font-size: 12px; font-family: 'SF Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .c-plan   { color: rgba(96,165,250,.75); }
+    .c-go     { color: rgba(110,216,127,.75); }
+    .c-wait   { color: rgba(251,191,36,.8); }
+    .c-error  { color: rgba(255,123,114,.85); }
+    .c-review { color: rgba(210,168,255,.8); font-weight: 600; }
+    .c-resume { color: rgba(255,255,255,.4); }
+
+    .vdiv { width: 1px; height: 17px; background: rgba(255,255,255,.07); flex-shrink: 0; margin: 0 3px; }
+
+    /* Scope mini (mid only) */
+    .scope-mini {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 9px; border-radius: 10px;
+      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.05);
+      flex-shrink: 0; cursor: pointer; position: relative;
+    }
+    .scope-mini:hover .scope-popover { display: block; }
+    .sm-count { font-size: 12px; font-weight: 700; font-family: 'SF Mono', monospace; }
+    .sm-delta { font-size: 9px; font-weight: 700; font-family: 'SF Mono', monospace; }
+    .sm-bar { width: 26px; height: 3px; background: rgba(255,255,255,.07); border-radius: 2px; overflow: hidden; }
+    .sm-fill { height: 100%; border-radius: 2px; transition: width .5s ease, background .4s; }
+    .sm-lbl { font-size: 8px; color: rgba(255,255,255,.18); font-weight: 600; text-transform: uppercase; letter-spacing: .3px; }
+
+    .scope-popover {
+      display: none; position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      background: rgba(12,14,22,.97); border: 1px solid rgba(255,255,255,.1); border-radius: 12px;
+      padding: 10px; min-width: 220px; box-shadow: 0 16px 48px rgba(0,0,0,.7);
+      z-index: 2000; animation: fi .15s ease;
+    }
+    @keyframes fi { from{opacity:0;transform:translateX(-50%) translateY(-4px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+    .pop-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: rgba(255,255,255,.2); margin-bottom: 7px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .pop-file { display: flex; align-items: center; gap: 7px; padding: 4px 5px; border-radius: 5px; margin-bottom: 2px; }
+    .pop-file:hover { background: rgba(255,255,255,.04); }
+    .pf-icon { font-size: 10px; }
+    .pf-name { font-size: 11px; font-family: 'SF Mono', monospace; color: rgba(255,255,255,.55); flex: 1; }
+    .pf-name.warn { color: rgba(251,191,36,.7); }
+    .pf-delta { font-size: 10px; font-family: 'SF Mono', monospace; }
+    .pf-delta.add { color: rgba(110,216,127,.6); }
+    .pf-delta.warn { color: rgba(251,191,36,.65); }
+    .pop-foot { margin-top: 7px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.05); font-size: 9px; color: rgba(255,255,255,.2); }
+
+    /* Git block */
+    .git-b { display: flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 10px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.05); flex-shrink: 0; margin-left: 3px; }
+    .git-lbl { font-size: 9px; color: rgba(255,255,255,.18); font-weight: 600; }
+    .git-v { font-size: 10px; font-family: 'SF Mono', monospace; font-weight: 700; }
+    .git-v.safe  { color: rgba(110,216,127,.6); }
+    .git-v.stale { color: rgba(251,191,36,.65); }
+
+    /* Timer */
+    .timer { font-size: 11px; font-family: 'SF Mono', monospace; color: rgba(255,255,255,.2); padding: 0 7px; flex-shrink: 0; }
+
+    /* Notif badge */
+    .notif-b { display: flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 10px; background: rgba(251,191,36,.07); border: 1px solid rgba(251,191,36,.18); flex-shrink: 0; }
+    .notif-i { font-size: 11px; }
+    .notif-t { font-size: 10px; font-weight: 700; color: rgba(251,191,36,.75); }
+
+    /* ════════════ PEEK CARD ════════════ */
+    .peek {
+      display: none; border-top: 1px solid rgba(255,255,255,.05);
+      padding: 12px 10px 10px; animation: fi .2s ease;
+    }
+    .peek.open { display: block; }
+
+    /* Section label */
+    .peek-section { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: rgba(255,255,255,.2); margin-bottom: 8px; }
+
+    /* Plan preview (PRE-SESSION) */
+    .plan-preview {
+      padding: 10px 12px;
+      background: rgba(96,165,250,.05); border: 1px solid rgba(96,165,250,.1);
+      border-radius: 11px; margin-bottom: 10px;
+    }
+    .plan-task { font-size: 13px; font-weight: 600; color: rgba(255,255,255,.75); margin-bottom: 8px; line-height: 1.4; }
+    .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+    .plan-stat { background: rgba(255,255,255,.04); border-radius: 8px; padding: 7px 9px; }
+    .plan-stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: .4px; color: rgba(255,255,255,.25); margin-bottom: 3px; font-weight: 700; }
+    .plan-stat-val { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.65); font-family: 'SF Mono', monospace; }
+    .plan-claudemd {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px 10px; background: rgba(255,255,255,.03); border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.05); margin-bottom: 10px;
+    }
+    .plan-claudemd-icon { font-size: 13px; flex-shrink: 0; }
+    .plan-claudemd-text { font-size: 11px; color: rgba(255,255,255,.45); line-height: 1.5; }
+    .plan-claudemd-text strong { color: rgba(255,255,255,.6); font-weight: 600; }
+    .plan-reading { font-size: 10px; color: rgba(96,165,250,.6); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+    .plan-reading-dot { width: 5px; height: 5px; border-radius: 50%; background: #60a5fa; animation: p-blue 2s infinite; }
+
+    /* Mission brief (shared) */
+    .mission { display: flex; gap: 9px; align-items: flex-start; padding: 8px 10px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.04); border-radius: 10px; margin-bottom: 9px; }
+    .mission-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+    .mission-t { font-size: 11.5px; color: rgba(255,255,255,.65); font-weight: 500; line-height: 1.4; margin-bottom: 3px; }
+    .mission-m { font-size: 10px; color: rgba(255,255,255,.25); display: flex; gap: 10px; }
+
+    /* Progress bar */
+    .prog-wrap { height: 3px; background: rgba(255,255,255,.05); border-radius: 2px; margin-bottom: 9px; overflow: hidden; }
+    .prog-fill { height: 100%; border-radius: 2px; transition: width 1s ease, background .5s; }
+
+    /* Recent actions */
+    .recent { display: flex; flex-direction: column; gap: 3px; margin-bottom: 9px; }
+    .ra { display: flex; align-items: center; gap: 7px; padding: 5px 7px; border-radius: 7px; font-family: 'SF Mono', monospace; font-size: 10.5px; }
+    .ra.done { background: rgba(110,216,127,.04); }
+    .ra.run { background: rgba(210,168,255,.05); border: 1px solid rgba(210,168,255,.08); }
+    .ra.warn { background: rgba(251,191,36,.04); border: 1px solid rgba(251,191,36,.08); }
+    .ra.fail { background: rgba(255,123,114,.05); border: 1px solid rgba(255,123,114,.1); }
+    .ra-ic { flex-shrink: 0; }
+    .ra-v { color: rgba(255,255,255,.28); width: 50px; flex-shrink: 0; }
+    .ra-p { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ra-p.g { color: rgba(110,216,127,.7); } .ra-p.p { color: rgba(210,168,255,.7); }
+    .ra-p.a { color: rgba(251,191,36,.7); }   .ra-p.r { color: rgba(255,123,114,.75); }
+    .ra-d { color: rgba(255,255,255,.18); flex-shrink: 0; font-size: 10px; }
+
+    /* ══ REVIEW CARD (post-session, new) ══ */
+    .review-card { margin-bottom: 10px; }
+
+    .review-checks {
+      display: flex; flex-direction: column; gap: 5px;
+      padding: 10px 12px; background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.05); border-radius: 11px; margin-bottom: 9px;
+    }
+    .review-check { display: flex; align-items: center; gap: 9px; }
+    .rc-icon { font-size: 13px; flex-shrink: 0; width: 18px; text-align: center; }
+    .rc-label { font-size: 12px; color: rgba(255,255,255,.55); font-weight: 500; }
+    .rc-val { font-size: 12px; font-weight: 700; margin-left: auto; font-family: 'SF Mono', monospace; }
+    .rc-val.pass  { color: rgba(110,216,127,.85); }
+    .rc-val.warn  { color: rgba(251,191,36,.8); }
+    .rc-val.info  { color: rgba(255,255,255,.4); }
+
+    .diff-summary {
+      display: flex; gap: 6px; align-items: center; justify-content: center;
+      padding: 10px; background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.05); border-radius: 10px; margin-bottom: 9px;
+    }
+    .diff-num { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; font-family: 'SF Mono', monospace; }
+    .diff-num.add { color: rgba(110,216,127,.8); }
+    .diff-num.del { color: rgba(255,123,114,.75); }
+    .diff-sep { color: rgba(255,255,255,.15); font-size: 14px; }
+    .diff-files { font-size: 11px; color: rgba(255,255,255,.3); }
+
+    /* Claude.md prompt (new) */
+    .claudemd-prompt {
+      display: flex; align-items: center; gap: 9px;
+      padding: 9px 11px; background: rgba(251,191,36,.05);
+      border: 1px solid rgba(251,191,36,.15); border-radius: 10px;
+      cursor: pointer; transition: background .15s; margin-bottom: 9px;
+    }
+    .claudemd-prompt:hover { background: rgba(251,191,36,.09); }
+    .cdmd-icon { font-size: 14px; }
+    .cdmd-text { flex: 1; }
+    .cdmd-title { font-size: 12px; font-weight: 600; color: rgba(251,191,36,.8); }
+    .cdmd-sub   { font-size: 10px; color: rgba(255,255,255,.3); margin-top: 1px; }
+    .cdmd-arrow { font-size: 14px; color: rgba(251,191,36,.5); }
+
+    /* ══ RESUME CARD ══ */
+    .resume-brief {
+      padding: 10px 12px; background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06); border-radius: 11px; margin-bottom: 9px;
+    }
+    .resume-ago { font-size: 11px; color: rgba(255,255,255,.3); margin-bottom: 8px; }
+    .resume-last { font-size: 12px; color: rgba(255,255,255,.6); font-weight: 500; margin-bottom: 6px; }
+    .resume-pending {
+      display: flex; align-items: center; gap: 7px; padding: 7px 9px;
+      background: rgba(251,191,36,.06); border: 1px solid rgba(251,191,36,.15); border-radius: 8px;
+    }
+    .rp-icon { font-size: 12px; }
+    .rp-text { font-size: 11px; color: rgba(251,191,36,.75); font-weight: 500; }
+
+    /* Action buttons */
+    .btns { display: flex; gap: 7px; }
+    .abtn { flex: 1; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s; border: 1px solid; }
+    .b-start    { background: rgba(96,165,250,.1); border-color: rgba(96,165,250,.25); color: rgba(96,165,250,.9); }
+    .b-start:hover { background: rgba(96,165,250,.16); }
+    .b-refine   { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.1); color: rgba(255,255,255,.5); }
+    .b-steer    { background: rgba(210,168,255,.07); border-color: rgba(210,168,255,.18); color: rgba(210,168,255,.8); }
+    .b-steer:hover { background: rgba(210,168,255,.13); }
+    .b-pause    { background: rgba(251,191,36,.07); border-color: rgba(251,191,36,.18); color: rgba(251,191,36,.8); }
+    .b-pause:hover { background: rgba(251,191,36,.13); }
+    .b-rollback { background: rgba(255,123,114,.06); border-color: rgba(255,123,114,.14); color: rgba(255,123,114,.7); }
+    .b-rollback:hover { background: rgba(255,123,114,.11); }
+    .b-ship     { flex: 2; background: rgba(110,216,127,.12); border-color: rgba(110,216,127,.3); color: rgba(110,216,127,.95); font-size: 13px; font-weight: 700; }
+    .b-ship:hover { background: rgba(110,216,127,.18); }
+    .b-approve  { flex: 2; background: rgba(110,216,127,.1); border-color: rgba(110,216,127,.25); color: rgba(110,216,127,.9); }
+    .b-approve:hover { background: rgba(110,216,127,.16); }
+    .b-resume-btn { flex: 2; background: rgba(96,165,250,.1); border-color: rgba(96,165,250,.25); color: rgba(96,165,250,.9); }
+    .b-fix      { flex: 2; background: rgba(210,168,255,.08); border-color: rgba(210,168,255,.18); color: rgba(210,168,255,.85); }
+    .b-fix:hover { background: rgba(210,168,255,.14); }
+
+    /* Flash ring */
+    .flash-ring { position: absolute; inset: -2px; border-radius: 24px; border: 2px solid rgba(210,168,255,.7); opacity: 0; pointer-events: none; }
+    .flash-ring.flash { animation: flashout .9s ease-out forwards; }
+    @keyframes flashout { 0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(1.04)} }
+
+    /* Trust badge */
+    .trust-b {
+      position: absolute; bottom: -11px; right: 14px;
+      display: flex; align-items: center; gap: 5px;
+      padding: 2px 8px; background: rgba(10,12,18,.96);
+      border: 1px solid rgba(255,255,255,.07); border-radius: 20px;
+      cursor: pointer;
+    }
+    .trust-b:hover .trust-tip { display: block; }
+    .trust-icon { font-size: 9px; color: rgba(255,255,255,.22); }
+    .trust-txt { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: rgba(255,255,255,.18); }
+    .trust-tip {
+      display: none; position: absolute; bottom: calc(100% + 8px); right: 0;
+      background: rgba(12,14,22,.97); border: 1px solid rgba(255,255,255,.1);
+      border-radius: 10px; padding: 10px 12px; min-width: 220px;
+      font-size: 11px; color: rgba(255,255,255,.55); line-height: 1.6;
+      z-index: 3000; box-shadow: 0 12px 40px rgba(0,0,0,.7); animation: fi .15s ease;
+    }
+    .trust-tip strong { color: rgba(255,255,255,.8); display: block; margin-bottom: 4px; }
+    .tip-row { display: flex; gap: 6px; margin-bottom: 2px; }
+    .tip-dot { color: rgba(110,216,127,.6); flex-shrink: 0; }
+
+    /* ── Controls ── */
+    .controls {
+      position: fixed; bottom: 16px;
+      left: calc(256px + 50%); transform: translateX(-50%);
+      background: rgba(10,12,18,.97); backdrop-filter: blur(20px);
+      border-radius: 12px; border: 1px solid rgba(255,255,255,.07);
+      padding: 8px 12px; display: flex; gap: 6px; z-index: 500; align-items: center;
+    }
+    .ctrl-l { font-size: 9px; color: rgba(255,255,255,.18); text-transform: uppercase; letter-spacing: .5px; margin-right: 2px; }
+    .cbtn {
+      padding: 5px 10px; border-radius: 7px; background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.07); color: rgba(255,255,255,.4);
+      font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit;
+      transition: all .15s; white-space: nowrap;
+    }
+    .cbtn:hover { background: rgba(255,255,255,.09); color: rgba(255,255,255,.7); }
+    .cbtn.active { background: rgba(110,216,127,.1); border-color: rgba(110,216,127,.25); color: #6ed87f; }
+    .cbtn.active.plan-active { background: rgba(96,165,250,.1); border-color: rgba(96,165,250,.25); color: #60a5fa; }
+    .cbtn.active.review-active { background: rgba(210,168,255,.1); border-color: rgba(210,168,255,.25); color: #d2a8ff; }
+    .cbtn.active.resume-active { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.12); color: rgba(255,255,255,.55); }
+    .cdiv { width: 1px; height: 17px; background: rgba(255,255,255,.07); }
+  </style>
+</head>
+<body>
+
+<!-- Menubar -->
+<div class="menubar">
+  <span class="mb-apple">&#xF8FF;</span>
+  <span class="mb-item" style="font-weight:700;color:rgba(255,255,255,.8)">Code</span>
+  <span class="mb-item">File</span><span class="mb-item">View</span><span class="mb-item">Terminal</span>
+  <div class="mb-right">
+    <span class="mb-r">feat/auth ⎇</span>
+    <span class="mb-r">07:15</span>
+  </div>
+</div>
+
+<!-- Lifecycle panel -->
+<div class="lifecycle-panel">
+  <div class="lc-title">Three moments — v4 co-pilot</div>
+
+  <!-- PRE -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-dot pre">◎</div>
+      <span class="phase-name pre">Pre-session</span>
+      <span class="phase-tag tag-new">new</span>
+    </div>
+    <div class="phase-signals">
+      <div class="phase-signal"><span class="sig-ic" style="color:#60a5fa">◎</span> PLAN — task preview + scope estimate</div>
+    </div>
+    <div class="phase-desc">Island shows what Claude is about to do before it does it. Reads CLAUDE.md context, estimates files, lets you approve or refine.</div>
+  </div>
+
+  <div class="phase-connector"></div>
+
+  <!-- MID -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-dot mid">●</div>
+      <span class="phase-name mid">Mid-session</span>
+      <span class="phase-tag tag-v3">v3</span>
+    </div>
+    <div class="phase-signals">
+      <div class="phase-signal"><span class="sig-ic" style="color:#6ed87f">●</span> GO — on track</div>
+      <div class="phase-signal"><span class="sig-ic" style="color:#fbbf24">●</span> WAIT — needs your call</div>
+      <div class="phase-signal"><span class="sig-ic" style="color:#fbbf24">●</span> SCOPE — blast radius expanding</div>
+      <div class="phase-signal"><span class="sig-ic" style="color:#ff7b72">●</span> ERROR — failed, safe to rollback</div>
+    </div>
+    <div class="phase-desc">Scope deviation, file list hover, session labels, WAIT notification.</div>
+  </div>
+
+  <div class="phase-connector"></div>
+
+  <!-- POST -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-dot post">✓</div>
+      <span class="phase-name post">Post-session</span>
+      <span class="phase-tag tag-new">new</span>
+    </div>
+    <div class="phase-signals">
+      <div class="phase-signal"><span class="sig-ic" style="color:#d2a8ff">✓</span> REVIEW — ship / rollback decision</div>
+    </div>
+    <div class="phase-desc">Tests, diff, safety checks. One-click ship. Claude.md improvement prompt — the flywheel power users compound on.</div>
+  </div>
+
+  <div class="phase-divider"></div>
+
+  <!-- RESUME -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-dot resume">↩</div>
+      <span class="phase-name resume">Resume</span>
+      <span class="phase-tag tag-new">new</span>
+    </div>
+    <div class="phase-signals">
+      <div class="phase-signal"><span class="sig-ic" style="color:rgba(255,255,255,.3)">↩</span> PAUSED — resumption brief</div>
+    </div>
+    <div class="phase-desc">Returns from idle/paused showing last action, pending decisions, elapsed time. No more "what was it doing?"</div>
+  </div>
+</div>
+
+<!-- Editor -->
+<div class="editor-area">
+  <div class="tabs-bar">
+    <div class="tab">auth.service.ts <span class="tab-m"></span></div>
+    <div class="tab active">refresh.handler.ts <span class="tab-m"></span></div>
+    <div class="tab">auth.spec.ts</div>
+  </div>
+  <div class="code-body">
+    <div class="cl"><span class="ln">1</span><span class="kw">import</span> <span class="op">{ </span><span class="tp">Injectable</span><span class="op"> }</span> <span class="kw">from</span> <span class="str">'@nestjs/common'</span><span class="op">;</span></div>
+    <div class="cl"><span class="ln">2</span><span class="kw">import</span> <span class="op">{ </span><span class="tp">JwtService</span><span class="op"> }</span> <span class="kw">from</span> <span class="str">'@nestjs/jwt'</span><span class="op">;</span></div>
+    <div class="cl"><span class="ln">3</span><span class="cm">// Refresh token rotation — v4 co-pilot session</span></div>
+    <div class="cl"><span class="ln">4</span></div>
+    <div class="cl hl"><span class="ln">5</span><span class="op">@</span><span class="fn">Injectable</span><span class="op">()</span></div>
+    <div class="cl hl"><span class="ln">6</span><span class="kw">export class</span> <span class="tp">RefreshHandler</span> <span class="op">{</span></div>
+    <div class="cl"><span class="ln">7</span>  <span class="kw">constructor</span><span class="op">(</span><span class="kw">private</span> <span class="pl">jwtService</span><span class="op">:</span> <span class="tp">JwtService</span><span class="op">) {}</span></div>
+    <div class="cl"><span class="ln">8</span></div>
+    <div class="cl hl"><span class="ln">9</span>  <span class="kw">async</span> <span class="fn">rotate</span><span class="op">(</span><span class="pl">token</span><span class="op">:</span> <span class="kw">string</span><span class="op">) {</span></div>
+    <div class="cl"><span class="ln">10</span>   <span class="kw">const</span> <span class="pl">payload</span> <span class="op">=</span> <span class="kw">await</span> <span class="kw">this</span><span class="op">.</span><span class="pl">jwtService</span><span class="op">.</span><span class="fn">verifyAsync</span><span class="op">(</span><span class="pl">token</span><span class="op">);</span></div>
+    <div class="cl"><span class="ln">11</span>   <span class="cm">// invalidate old, issue new pair</span></div>
+    <div class="cl"><span class="ln">12</span>   <span class="kw">return</span> <span class="kw">this</span><span class="op">.</span><span class="fn">issueTokenPair</span><span class="op">(</span><span class="pl">payload</span><span class="op">.</span><span class="kw">sub</span><span class="op">);</span></div>
+    <div class="cl"><span class="ln">13</span>  <span class="op">}</span></div>
+    <div class="cl"><span class="ln">14</span><span class="op">}</span></div>
+  </div>
+</div>
+
+<!-- ═══════ ISLAND v4 ═══════ -->
+<div class="island-wrap">
+  <div class="island s-plan" id="island">
+    <div class="flash-ring" id="flashRing"></div>
+
+    <!-- Main row -->
+    <div class="main-row" id="mainRow">
+      <div class="sig-pill plan" id="sigPill">
+        <div class="sig-dot plan" id="sigDot"></div>
+        <span class="sig-label plan" id="sigLabel">PLAN</span>
+      </div>
+      <div class="sess-label">
+        <div class="a-logo logo-c" id="agentLogo">C</div>
+        <span class="sess-repo" id="sessRepo">auth-system</span>
+      </div>
+      <div class="cur-act" id="curAct" onclick="togglePeek()">
+        <span class="act-v" id="actVerb">reading</span>
+        <span class="act-f c-plan" id="actFile">analyzing codebase · planning</span>
+      </div>
+
+      <!-- Scope mini (hidden in PLAN/REVIEW/RESUME) -->
+      <div class="vdiv" id="vd1" style="display:none"></div>
+      <div class="scope-mini" id="scopeMini" style="display:none">
+        <div style="display:flex;flex-direction:column;gap:1px">
+          <div class="sm-count" id="smCount" style="color:rgba(110,216,127,.75)">5</div>
+          <div class="sm-delta" id="smDelta" style="color:rgba(255,255,255,.2)">on track</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <div class="sm-bar"><div class="sm-fill" id="smFill" style="width:33%;background:rgba(110,216,127,.55)"></div></div>
+          <div class="sm-lbl">scope</div>
+        </div>
+        <div class="scope-popover" id="scopePopover">
+          <div class="pop-title">Files touched</div>
+          <div id="popFileList">
+            <div class="pop-file"><span class="pf-icon">📝</span><span class="pf-name">auth.service.ts</span><span class="pf-delta add">+12</span></div>
+            <div class="pop-file"><span class="pf-icon">📝</span><span class="pf-name">jwt.middleware.ts</span><span class="pf-delta add">+84</span></div>
+            <div class="pop-file"><span class="pf-icon">🆕</span><span class="pf-name">auth.spec.ts</span><span class="pf-delta add">+88</span></div>
+            <div class="pop-file"><span class="pf-icon">✏️</span><span class="pf-name">refresh.handler.ts</span><span class="pf-delta add">…</span></div>
+          </div>
+          <div class="pop-foot" id="popFoot">Expected: ~5 files</div>
+        </div>
+      </div>
+
+      <!-- Notif badge (WAIT only) -->
+      <div class="notif-b" id="notifBadge" style="display:none;margin-left:4px">
+        <span class="notif-i">🔔</span><span class="notif-t">Notified</span>
+      </div>
+
+      <!-- Git (hidden in PLAN/REVIEW/RESUME) -->
+      <div class="vdiv" id="vd2" style="display:none"></div>
+      <div class="git-b" id="gitBlock" style="display:none">
+        <span class="git-lbl">↩</span>
+        <span class="git-v safe" id="gitVal">safe</span>
+      </div>
+
+      <div class="timer" id="timer" style="display:none">22:14</div>
+    </div>
+
+    <!-- PEEK card -->
+    <div class="peek" id="peek">
+
+      <!-- PRE-SESSION: PLAN -->
+      <div id="peek-plan">
+        <div class="plan-reading">
+          <div class="plan-reading-dot"></div>
+          Reading 4 files · formulating plan
+        </div>
+        <div class="plan-preview">
+          <div class="plan-task">Build JWT auth system with refresh token rotation and session revocation</div>
+          <div class="plan-grid">
+            <div class="plan-stat">
+              <div class="plan-stat-label">Est. scope</div>
+              <div class="plan-stat-val">5–7 files</div>
+            </div>
+            <div class="plan-stat">
+              <div class="plan-stat-label">Est. time</div>
+              <div class="plan-stat-val">~20 min</div>
+            </div>
+            <div class="plan-stat">
+              <div class="plan-stat-label">Will touch</div>
+              <div class="plan-stat-val">auth/, tests/</div>
+            </div>
+            <div class="plan-stat">
+              <div class="plan-stat-label">Risk</div>
+              <div class="plan-stat-val" style="color:rgba(110,216,127,.75)">Low</div>
+            </div>
+          </div>
+          <div class="plan-claudemd">
+            <div class="plan-claudemd-icon">📋</div>
+            <div class="plan-claudemd-text">Using <strong>CLAUDE.md</strong> context: NestJS patterns, run pytest not npm test, avoid nested imports</div>
+          </div>
+        </div>
+        <div class="btns">
+          <div class="abtn b-start">▶ Let it run</div>
+          <div class="abtn b-refine">✏ Refine task</div>
+        </div>
+      </div>
+
+      <!-- MID-SESSION shared peek -->
+      <div id="peek-mid" style="display:none">
+        <div class="mission">
+          <div class="mission-icon" id="midMissionIcon">⚡</div>
+          <div>
+            <div class="mission-t" id="midMissionTask">Build JWT auth system with refresh token rotation</div>
+            <div class="mission-m"><span>🕐 <span id="midTime">18:32</span></span><span>📁 <span id="midScope">5 files</span></span><span id="midGit">↩ 4m ago</span></div>
+          </div>
+        </div>
+        <div class="prog-wrap"><div class="prog-fill" id="midProg" style="width:65%;background:linear-gradient(90deg,rgba(110,216,127,.4),rgba(110,216,127,.7))"></div></div>
+        <div class="recent" id="midRecent"></div>
+        <div class="btns" id="midBtns"></div>
+      </div>
+
+      <!-- POST-SESSION: REVIEW -->
+      <div id="peek-review" style="display:none">
+        <div class="review-checks">
+          <div class="review-check">
+            <span class="rc-icon">✅</span>
+            <span class="rc-label">Tests</span>
+            <span class="rc-val pass">6 / 6 passing</span>
+          </div>
+          <div class="review-check">
+            <span class="rc-icon">✅</span>
+            <span class="rc-label">Scope</span>
+            <span class="rc-val pass">5 files · on track</span>
+          </div>
+          <div class="review-check">
+            <span class="rc-icon">✅</span>
+            <span class="rc-label">Safety</span>
+            <span class="rc-val pass">No secrets exposed</span>
+          </div>
+          <div class="review-check">
+            <span class="rc-icon">✅</span>
+            <span class="rc-label">Patterns</span>
+            <span class="rc-val info">Consistent with codebase</span>
+          </div>
+        </div>
+        <div class="diff-summary">
+          <span class="diff-num add">+284</span>
+          <span class="diff-sep">/</span>
+          <span class="diff-num del">−12</span>
+          <span class="diff-files">across 5 files</span>
+        </div>
+        <div class="claudemd-prompt">
+          <span class="cdmd-icon">💡</span>
+          <div class="cdmd-text">
+            <div class="cdmd-title">Update CLAUDE.md · 2 suggestions</div>
+            <div class="cdmd-sub">"Add: run npm test not npx jest · prefer constructor injection"</div>
+          </div>
+          <span class="cdmd-arrow">›</span>
+        </div>
+        <div class="btns">
+          <div class="abtn b-ship">🚀 Ship it</div>
+          <div class="abtn b-rollback">↩ Rollback</div>
+        </div>
+      </div>
+
+      <!-- RESUME brief -->
+      <div id="peek-resume" style="display:none">
+        <div class="resume-brief">
+          <div class="resume-ago">Paused 47 minutes ago · 5 files touched</div>
+          <div class="resume-last">Last action: writing refresh.handler.ts (+112 lines)</div>
+          <div class="resume-pending">
+            <span class="rp-icon">⚠️</span>
+            <span class="rp-text">Pending: approval needed before overwriting auth.service.ts</span>
+          </div>
+        </div>
+        <div class="mission" style="margin-bottom:9px">
+          <div class="mission-icon">⚡</div>
+          <div>
+            <div class="mission-t">Build JWT auth system with refresh token rotation</div>
+            <div class="mission-m"><span>📁 5 files</span><span>↩ safe</span><span style="color:rgba(251,191,36,.6)">47m paused</span></div>
+          </div>
+        </div>
+        <div class="btns">
+          <div class="abtn b-resume-btn">↩ Resume session</div>
+          <div class="abtn b-rollback">Discard</div>
+        </div>
+      </div>
+
+    </div><!-- /peek -->
+  </div><!-- /island -->
+
+  <!-- Trust badge -->
+  <div class="trust-b">
+    <span class="trust-icon">🔒</span>
+    <span class="trust-txt">local-only · open source</span>
+    <div class="trust-tip">
+      <strong>How it works</strong>
+      <div class="tip-row"><span class="tip-dot">✓</span> Reads only: pgrep + git status</div>
+      <div class="tip-row"><span class="tip-dot">✓</span> No network calls, no telemetry</div>
+      <div class="tip-row"><span class="tip-dot">✓</span> Open source — verify the source</div>
+    </div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <span class="ctrl-l">Phase</span>
+  <button class="cbtn plan-active active" id="btn-plan"   onclick="set('plan')">◎ PLAN</button>
+  <div class="cdiv"></div>
+  <span class="ctrl-l">Mid</span>
+  <button class="cbtn" id="btn-go"     onclick="set('go')">🟢 GO</button>
+  <button class="cbtn" id="btn-wait"   onclick="set('wait')">🟡 WAIT</button>
+  <button class="cbtn" id="btn-scope"  onclick="set('scope')">📈 SCOPE</button>
+  <button class="cbtn" id="btn-error"  onclick="set('error')">🔴 ERROR</button>
+  <div class="cdiv"></div>
+  <button class="cbtn review-active" id="btn-review" onclick="set('review')">✓ REVIEW</button>
+  <div class="cdiv"></div>
+  <button class="cbtn resume-active" id="btn-resume" onclick="set('resume')">↩ RESUME</button>
+  <div class="cdiv"></div>
+  <button class="cbtn" onclick="togglePeek()">Peek</button>
+</div>
+
+<script>
+  let peekOpen = false;
+  let timerSecs = 18*60+32;
+  let timerInterval;
+
+  function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      timerSecs++;
+      const t = `${Math.floor(timerSecs/60)}:${(timerSecs%60).toString().padStart(2,'0')}`;
+      const el = document.getElementById('timer');
+      const mt = document.getElementById('midTime');
+      if(el) el.textContent = t;
+      if(mt) mt.textContent = t;
+    }, 1000);
+  }
+
+  function showScopeMini(show) {
+    document.getElementById('vd1').style.display = show ? '' : 'none';
+    document.getElementById('scopeMini').style.display = show ? 'flex' : 'none';
+  }
+  function showGit(show) {
+    document.getElementById('vd2').style.display = show ? '' : 'none';
+    document.getElementById('gitBlock').style.display = show ? 'flex' : 'none';
+  }
+  function showTimer(show) {
+    document.getElementById('timer').style.display = show ? '' : 'none';
+  }
+  function showNotif(show) {
+    document.getElementById('notifBadge').style.display = show ? 'flex' : 'none';
+  }
+
+  function setPeekView(view) {
+    ['plan','mid','review','resume'].forEach(v => {
+      document.getElementById('peek-'+v).style.display = v === view ? 'block' : 'none';
+    });
+  }
+
+  function set(s) {
+    document.querySelectorAll('.cbtn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('btn-'+s);
+    if(btn) {
+      btn.classList.add('active');
+      if(s==='plan') btn.classList.add('plan-active');
+      if(s==='review') btn.classList.add('review-active');
+      if(s==='resume') btn.classList.add('resume-active');
+    }
+
+    const island  = document.getElementById('island');
+    const sigPill = document.getElementById('sigPill');
+    const sigDot  = document.getElementById('sigDot');
+    const sigLabel= document.getElementById('sigLabel');
+    const actVerb = document.getElementById('actVerb');
+    const actFile = document.getElementById('actFile');
+    const gitVal  = document.getElementById('gitVal');
+    const flashRing = document.getElementById('flashRing');
+    const smCount = document.getElementById('smCount');
+    const smDelta = document.getElementById('smDelta');
+    const smFill  = document.getElementById('smFill');
+    const midRecent = document.getElementById('midRecent');
+    const midBtns  = document.getElementById('midBtns');
+    const midProg  = document.getElementById('midProg');
+    const midScope = document.getElementById('midScope');
+    const midGit   = document.getElementById('midGit');
+    const midMissionTask = document.getElementById('midMissionTask');
+
+    island.className = 'island';
+    showNotif(false);
+
+    if(s==='plan') {
+      island.classList.add('s-plan');
+      sigPill.className='sig-pill plan'; sigDot.className='sig-dot plan';
+      sigLabel.className='sig-label plan'; sigLabel.textContent='PLAN';
+      actVerb.textContent='reading';
+      actFile.className='act-f c-plan'; actFile.textContent='analyzing codebase · planning';
+      showScopeMini(false); showGit(false); showTimer(false);
+      setPeekView('plan');
+      clearInterval(timerInterval);
+    }
+    else if(s==='go') {
+      island.classList.add('s-go');
+      sigPill.className='sig-pill go'; sigDot.className='sig-dot go';
+      sigLabel.className='sig-label go'; sigLabel.textContent='GO';
+      actVerb.textContent='writing';
+      actFile.className='act-f c-go'; actFile.textContent='refresh.handler.ts';
+      showScopeMini(true); showGit(true); showTimer(true);
+      smCount.textContent='5'; smCount.style.color='rgba(110,216,127,.75)';
+      smDelta.textContent='on track'; smDelta.style.color='rgba(255,255,255,.2)';
+      smFill.style.width='33%'; smFill.style.background='rgba(110,216,127,.55)';
+      gitVal.textContent='safe'; gitVal.className='git-v safe';
+      midProg.style.width='65%'; midProg.style.background='linear-gradient(90deg,rgba(110,216,127,.4),rgba(110,216,127,.7))';
+      midScope.textContent='5 files'; midGit.innerHTML='↩ 4m ago';
+      midMissionTask.textContent='Build JWT auth system with refresh token rotation';
+      midRecent.innerHTML=`
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-v">read</span><span class="ra-p g">auth.module.ts, auth.service.ts</span><span class="ra-d">2 files</span></div>
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-v">write</span><span class="ra-p g">jwt.middleware.ts</span><span class="ra-d">+84</span></div>
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-v">write</span><span class="ra-p g">auth.spec.ts</span><span class="ra-d">+88</span></div>
+        <div class="ra run"><span class="ra-ic" style="color:#d2a8ff">◆</span><span class="ra-v">write</span><span class="ra-p p">refresh.handler.ts</span><span class="ra-d" style="color:#d2a8ff">…</span></div>`;
+      midBtns.innerHTML=`<div class="abtn b-steer">✦ Steer</div><div class="abtn b-pause">⏸ Pause</div><div class="abtn b-rollback">↩ Rollback</div>`;
+      setPeekView('mid');
+      timerSecs=18*60+32; startTimer();
+    }
+    else if(s==='wait') {
+      island.classList.add('s-wait');
+      sigPill.className='sig-pill wait'; sigDot.className='sig-dot wait';
+      sigLabel.className='sig-label wait'; sigLabel.textContent='WAIT';
+      actVerb.textContent='asking';
+      actFile.className='act-f c-wait'; actFile.textContent='ok to overwrite auth.service.ts?';
+      showScopeMini(true); showGit(true); showTimer(false);
+      showNotif(true);
+      smCount.textContent='5'; smDelta.textContent='on track';
+      gitVal.textContent='safe'; gitVal.className='git-v safe';
+      midProg.style.width='50%'; midProg.style.background='rgba(251,191,36,.35)';
+      midRecent.innerHTML=`
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-v">write</span><span class="ra-p g">jwt.middleware.ts</span><span class="ra-d">+84</span></div>
+        <div class="ra warn"><span class="ra-ic" style="color:#fbbf24">?</span><span class="ra-v">prompt</span><span class="ra-p a">Waiting: ok to overwrite auth.service.ts?</span></div>`;
+      midBtns.innerHTML=`<div class="abtn b-approve">✓ Approve</div><div class="abtn b-pause">✕ Skip</div>`;
+      setPeekView('mid');
+      clearInterval(timerInterval);
+    }
+    else if(s==='scope') {
+      island.classList.add('s-scope');
+      sigPill.className='sig-pill scope'; sigDot.className='sig-dot scope';
+      sigLabel.className='sig-label scope'; sigLabel.textContent='SCOPE';
+      actVerb.textContent='writing';
+      actFile.className='act-f c-wait'; actFile.textContent='user.service.ts  ← unexpected';
+      showScopeMini(true); showGit(true); showTimer(false);
+      smCount.textContent='14'; smCount.style.color='rgba(251,191,36,.85)';
+      smDelta.textContent='+9 over'; smDelta.style.color='rgba(251,191,36,.7)';
+      smFill.style.width='92%'; smFill.style.background='rgba(251,191,36,.65)';
+      gitVal.textContent='11m ago'; gitVal.className='git-v stale';
+      midProg.style.width='50%'; midProg.style.background='rgba(251,191,36,.4)';
+      midScope.textContent='14 files'; midGit.innerHTML='<span style="color:rgba(251,191,36,.6)">↩ stale 11m</span>';
+      midRecent.innerHTML=`
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-v">write</span><span class="ra-p g">jwt.middleware.ts</span><span class="ra-d">+84</span></div>
+        <div class="ra warn"><span class="ra-ic" style="color:#fbbf24">⚠</span><span class="ra-v">write</span><span class="ra-p a">user.service.ts  (out of scope)</span><span class="ra-d" style="color:#fbbf24">+47</span></div>
+        <div class="ra run"><span class="ra-ic" style="color:#d2a8ff">◆</span><span class="ra-v">write</span><span class="ra-p a">role.guard.ts</span><span class="ra-d" style="color:#fbbf24">…</span></div>`;
+      midBtns.innerHTML=`<div class="abtn b-steer" style="flex:2">✦ Redirect scope</div><div class="abtn b-rollback">↩ Rollback</div>`;
+      setPeekView('mid');
+      clearInterval(timerInterval);
+    }
+    else if(s==='error') {
+      island.classList.add('s-error');
+      sigPill.className='sig-pill error'; sigDot.className='sig-dot error';
+      sigLabel.className='sig-label error'; sigLabel.textContent='ERROR';
+      actVerb.textContent='failed';
+      actFile.className='act-f c-error'; actFile.textContent='auth.spec.ts:42 · TypeError';
+      showScopeMini(true); showGit(true); showTimer(false);
+      smCount.textContent='5'; smDelta.textContent='on track'; smCount.style.color='rgba(255,255,255,.5)';
+      gitVal.textContent='safe'; gitVal.className='git-v safe';
+      midProg.style.width='65%'; midProg.style.background='rgba(255,123,114,.35)';
+      midRecent.innerHTML=`
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-v">write</span><span class="ra-p g">refresh.handler.ts</span><span class="ra-d">+112</span></div>
+        <div class="ra fail"><span class="ra-ic" style="color:#ff7b72">✗</span><span class="ra-v">run</span><span class="ra-p r">TypeError: jwtService.verifyAsync is not a function</span></div>`;
+      midBtns.innerHTML=`<div class="abtn b-fix" style="flex:2">✦ Fix with Claude</div><div class="abtn b-rollback">↩ Rollback</div>`;
+      setPeekView('mid');
+      clearInterval(timerInterval);
+    }
+    else if(s==='review') {
+      island.classList.add('s-review');
+      sigPill.className='sig-pill review'; sigDot.className='sig-dot review';
+      sigLabel.className='sig-label review'; sigLabel.textContent='REVIEW';
+      actVerb.textContent='';
+      actFile.className='act-f c-review'; actFile.textContent='✓ done · 6/6 tests · ready to ship';
+      showScopeMini(false); showGit(false); showTimer(false);
+      flashRing.className='flash-ring';
+      void flashRing.offsetWidth;
+      flashRing.classList.add('flash');
+      setPeekView('review');
+      clearInterval(timerInterval);
+    }
+    else if(s==='resume') {
+      island.classList.add('s-resume');
+      sigPill.className='sig-pill resume'; sigDot.className='sig-dot resume';
+      sigLabel.className='sig-label resume'; sigLabel.textContent='PAUSED';
+      actVerb.textContent='';
+      actFile.className='act-f c-resume'; actFile.textContent='paused 47m ago · needs your decision';
+      showScopeMini(false); showGit(false); showTimer(false);
+      setPeekView('resume');
+      clearInterval(timerInterval);
+    }
+
+    if(peekOpen) { peekOpen=false; document.getElementById('peek').classList.remove('open'); }
+  }
+
+  function togglePeek() {
+    peekOpen = !peekOpen;
+    document.getElementById('peek').classList.toggle('open', peekOpen);
+  }
+
+  document.addEventListener('click', e => {
+    const isl = document.getElementById('island');
+    if(!isl.contains(e.target) && peekOpen) {
+      peekOpen=false;
+      document.getElementById('peek').classList.remove('open');
+    }
+  });
+
+  // Slow scope tick on GO
+  let scopeTick = 5;
+  setInterval(() => {
+    if(document.getElementById('btn-go')?.classList.contains('active') && Math.random()<.12) {
+      scopeTick++;
+      const sc = document.getElementById('smCount');
+      const sf = document.getElementById('smFill');
+      if(sc) sc.textContent = scopeTick;
+      if(sf) sf.style.width = Math.min(scopeTick*6.5,100)+'%';
+    }
+  }, 3000);
+</script>
+
+</body>
+</html>
