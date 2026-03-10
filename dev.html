@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Desktop Island — Dev Agent Edition</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      background: #0d1117;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      user-select: none;
+    }
+
+    /* ── Editor Background ── */
+    .editor-bg {
+      position: absolute;
+      inset: 0;
+      background: #0d1117;
+    }
+
+    /* ── Menu Bar ── */
+    .menubar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 28px;
+      background: rgba(13,17,23,0.95);
+      backdrop-filter: blur(20px);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 20px;
+      z-index: 100;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .menubar-apple { font-size: 13px; color: rgba(255,255,255,0.8); }
+    .menubar-item { font-size: 13px; color: rgba(255,255,255,0.55); font-weight: 500; }
+    .menubar-right { margin-left: auto; display: flex; gap: 16px; }
+    .menubar-right-item { font-size: 11px; color: rgba(255,255,255,0.4); font-family: 'SF Mono', monospace; }
+
+    /* ── VS Code-style window ── */
+    .vscode {
+      position: absolute;
+      left: 0; right: 0;
+      top: 28px; bottom: 0;
+      display: flex;
+    }
+
+    .sidebar {
+      width: 52px;
+      background: #161b22;
+      border-right: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 12px;
+      gap: 20px;
+    }
+
+    .sidebar-icon {
+      width: 26px; height: 26px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: rgba(255,255,255,0.3);
+      cursor: pointer;
+    }
+    .sidebar-icon.active { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
+
+    .file-tree {
+      width: 220px;
+      background: #161b22;
+      border-right: 1px solid rgba(255,255,255,0.05);
+      padding: 12px 0;
+    }
+
+    .tree-section {
+      font-size: 10px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.25);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 0 14px 8px;
+    }
+
+    .tree-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 14px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .tree-item:hover { background: rgba(255,255,255,0.04); }
+    .tree-item.active { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+    .tree-item.modified { color: #e2c97e; }
+    .tree-item.new-file { color: #7ee787; }
+    .tree-item-icon { font-size: 11px; width: 14px; flex-shrink: 0; }
+    .tree-dot { width: 6px; height: 6px; border-radius: 50%; margin-left: auto; }
+    .tree-dot.modified { background: #e2c97e; }
+    .tree-dot.new-file { background: #7ee787; }
+
+    .editor-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .tabs {
+      height: 36px;
+      background: #161b22;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .tab {
+      height: 32px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.45);
+      border-right: 1px solid rgba(255,255,255,0.05);
+      cursor: pointer;
+    }
+    .tab.active {
+      background: #0d1117;
+      color: rgba(255,255,255,0.8);
+      border-bottom: 1px solid #0d1117;
+    }
+    .tab-dot { width: 7px; height: 7px; border-radius: 50%; background: #e2c97e; }
+
+    .code-editor {
+      flex: 1;
+      padding: 16px 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .code-line {
+      display: flex;
+      font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+      font-size: 12.5px;
+      line-height: 1.85;
+      padding: 0 16px 0 52px;
+      position: relative;
+    }
+    .line-num {
+      position: absolute;
+      left: 0;
+      width: 44px;
+      text-align: right;
+      color: rgba(255,255,255,0.18);
+      font-size: 11.5px;
+      padding-right: 16px;
+    }
+    .code-line.highlight-line { background: rgba(255,255,255,0.03); }
+
+    .kw { color: #ff7b72; }
+    .fn { color: #d2a8ff; }
+    .str { color: #a5d6ff; }
+    .cm { color: rgba(255,255,255,0.2); }
+    .tp { color: #79c0ff; }
+    .nm { color: #e2c97e; }
+    .op { color: rgba(255,255,255,0.5); }
+    .pl { color: #ffa657; }
+
+    /* ── Terminal Panel ── */
+    .terminal-panel {
+      height: 160px;
+      background: #0d1117;
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .terminal-tabs {
+      height: 32px;
+      background: #161b22;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .term-tab {
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      cursor: pointer;
+    }
+    .term-tab.active { color: rgba(255,255,255,0.7); }
+
+    .terminal-body {
+      padding: 8px 16px;
+      font-family: 'SF Mono', monospace;
+      font-size: 11.5px;
+      line-height: 1.7;
+    }
+
+    .term-line { color: rgba(255,255,255,0.45); }
+    .term-line.cmd { color: #7ee787; }
+    .term-line.output { color: rgba(255,255,255,0.6); }
+    .term-line.agent { color: #d2a8ff; }
+    .term-line.error { color: #ff7b72; }
+    .term-cursor::after {
+      content: '▌';
+      color: #7ee787;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* ════════════════════════════
+       THE ISLAND — DEV EDITION
+    ════════════════════════════ */
+    .island-wrap {
+      position: absolute;
+      top: 38px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .island {
+      position: relative;
+      background: rgba(13,17,23,0.92);
+      backdrop-filter: blur(40px) saturate(180%);
+      border-radius: 20px;
+      padding: 0 16px;
+      min-height: 44px;
+      display: flex;
+      flex-direction: column;
+      border: 1.5px solid rgba(255,255,255,0.09);
+      transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      min-width: 440px;
+      max-width: 600px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    }
+
+    /* Border states */
+    .island.s-active {
+      border-color: rgba(110,215,127,0.35);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(110,215,127,0.1);
+    }
+    .island.s-idle {
+      border-color: rgba(255,255,255,0.08);
+    }
+    .island.s-done {
+      border-color: rgba(110,215,127,0.5);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 30px rgba(110,215,127,0.2);
+    }
+    .island.s-error {
+      border-color: rgba(255,123,114,0.5);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 24px rgba(255,123,114,0.18);
+    }
+    .island.s-multi {
+      border-color: rgba(210,168,255,0.3);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(210,168,255,0.1);
+    }
+
+    /* ── Agent Row ── */
+    .agent-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: 44px;
+      cursor: pointer;
+      border-radius: 12px;
+      padding: 0 4px;
+      transition: background 0.15s;
+      position: relative;
+    }
+    .agent-row:hover { background: rgba(255,255,255,0.04); }
+
+    /* Status dot */
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .status-dot.active {
+      background: #6ed87f;
+      box-shadow: 0 0 0 0 rgba(110,216,127,0.4);
+      animation: pulse-green 2s infinite;
+    }
+    .status-dot.idle { background: rgba(255,255,255,0.2); }
+    .status-dot.done { background: #6ed87f; }
+    .status-dot.error { background: #ff7b72; animation: pulse-red 1.5s infinite; }
+    .status-dot.thinking {
+      background: #d2a8ff;
+      animation: pulse-purple 1.2s infinite;
+    }
+
+    @keyframes pulse-green {
+      0% { box-shadow: 0 0 0 0 rgba(110,216,127,0.5); }
+      70% { box-shadow: 0 0 0 7px rgba(110,216,127,0); }
+      100% { box-shadow: 0 0 0 0 rgba(110,216,127,0); }
+    }
+    @keyframes pulse-red {
+      0% { box-shadow: 0 0 0 0 rgba(255,123,114,0.5); }
+      70% { box-shadow: 0 0 0 6px rgba(255,123,114,0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,123,114,0); }
+    }
+    @keyframes pulse-purple {
+      0% { box-shadow: 0 0 0 0 rgba(210,168,255,0.5); }
+      70% { box-shadow: 0 0 0 5px rgba(210,168,255,0); }
+      100% { box-shadow: 0 0 0 0 rgba(210,168,255,0); }
+    }
+
+    /* Agent badge */
+    .agent-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .agent-logo {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .agent-logo.claude { background: linear-gradient(135deg, #cc785c 0%, #d4956a 100%); color: white; }
+    .agent-logo.codex { background: linear-gradient(135deg, #10a37f 0%, #1ab394 100%); color: white; }
+    .agent-logo.cursor { background: linear-gradient(135deg, #5865f2 0%, #7289da 100%); color: white; }
+
+    .agent-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.75);
+      white-space: nowrap;
+    }
+
+    /* Status text */
+    .agent-status {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .status-text {
+      font-size: 12px;
+      color: rgba(255,255,255,0.45);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: 'SF Mono', monospace;
+    }
+    .status-text.active-text { color: rgba(110,216,127,0.8); }
+    .status-text.thinking-text { color: rgba(210,168,255,0.8); }
+    .status-text.error-text { color: rgba(255,123,114,0.85); }
+    .status-text.done-text { color: rgba(110,216,127,0.9); font-weight: 600; }
+
+    /* Thinking dots */
+    .thinking-dots {
+      display: inline-flex;
+      gap: 3px;
+      align-items: center;
+    }
+    .thinking-dots span {
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: #d2a8ff;
+      animation: dot-bounce 1.4s infinite ease-in-out both;
+    }
+    .thinking-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .thinking-dots span:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes dot-bounce {
+      0%,80%,100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Right side stats */
+    .agent-stats {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .stat-chip {
+      font-size: 10px;
+      font-family: 'SF Mono', monospace;
+      color: rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.05);
+      padding: 2px 7px;
+      border-radius: 5px;
+      white-space: nowrap;
+    }
+    .stat-chip.files { color: rgba(226,201,126,0.7); background: rgba(226,201,126,0.08); }
+    .stat-chip.time { color: rgba(255,255,255,0.3); }
+    .stat-chip.done { color: rgba(110,216,127,0.8); background: rgba(110,216,127,0.08); }
+    .stat-chip.err { color: rgba(255,123,114,0.8); background: rgba(255,123,114,0.08); }
+
+    /* Agent row divider */
+    .row-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.05);
+      margin: 0 4px;
+    }
+
+    /* ── Peek Card ── */
+    .peek {
+      display: none;
+      padding: 10px 4px 6px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      animation: peekIn 0.2s ease;
+    }
+    .peek.open { display: block; }
+    @keyframes peekIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .peek-header {
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0 4px 8px;
+      display: flex;
+      gap: 16px;
+    }
+
+    .peek-header-stat { display: flex; gap: 5px; align-items: center; }
+    .peek-header-val { color: rgba(255,255,255,0.5); font-weight: 700; }
+
+    /* Tool call timeline */
+    .tool-timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-bottom: 10px;
+    }
+
+    .tool-call {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+      font-family: 'SF Mono', monospace;
+      font-size: 11px;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    .tool-call.running {
+      background: rgba(210,168,255,0.05);
+      border-color: rgba(210,168,255,0.12);
+    }
+    .tool-call.success {
+      background: rgba(110,216,127,0.04);
+      border-color: rgba(110,216,127,0.08);
+    }
+    .tool-call.fail {
+      background: rgba(255,123,114,0.05);
+      border-color: rgba(255,123,114,0.1);
+    }
+
+    .tool-icon { font-size: 12px; flex-shrink: 0; }
+    .tool-name { color: rgba(255,255,255,0.5); flex-shrink: 0; width: 70px; }
+    .tool-arg {
+      color: rgba(255,255,255,0.65);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tool-arg.path { color: #a5d6ff; }
+    .tool-arg.bash { color: #7ee787; }
+    .tool-arg.error { color: #ff7b72; }
+    .tool-time { color: rgba(255,255,255,0.18); flex-shrink: 0; }
+
+    /* Git diff summary */
+    .diff-summary {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 0 4px;
+    }
+
+    .diff-file {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 7px;
+      font-family: 'SF Mono', monospace;
+      font-size: 10.5px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .diff-filename { color: rgba(255,255,255,0.55); }
+    .diff-add { color: #7ee787; }
+    .diff-del { color: #ff7b72; }
+
+    /* ── Controls ── */
+    .controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(13,17,23,0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 9px 14px;
+      display: flex;
+      gap: 7px;
+      z-index: 500;
+      align-items: center;
+    }
+    .ctrl-label { font-size: 10px; color: rgba(255,255,255,0.2); margin-right: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .ctrl-btn {
+      padding: 5px 11px;
+      border-radius: 7px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.5);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+    .ctrl-btn:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); }
+    .ctrl-btn.active { background: rgba(110,216,127,0.12); border-color: rgba(110,216,127,0.25); color: #6ed87f; }
+    .ctrl-divider { width: 1px; height: 18px; background: rgba(255,255,255,0.07); }
+
+    /* Done flash overlay */
+    .done-flash {
+      position: absolute;
+      inset: -2px;
+      border-radius: 22px;
+      border: 2px solid rgba(110,216,127,0.8);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .done-flash.flash {
+      animation: flash-anim 0.6s ease-out;
+    }
+    @keyframes flash-anim {
+      0% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.03); }
+    }
+
+    /* Zero-config badge */
+    .zero-config-badge {
+      position: absolute;
+      top: -11px;
+      right: 16px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: rgba(13,17,23,0.9);
+      color: rgba(255,255,255,0.25);
+      padding: 2px 8px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.08);
+      display: none;
+    }
+
+  </style>
+</head>
+<body>
+
+<div class="editor-bg"></div>
+
+<!-- Menu Bar -->
+<div class="menubar">
+  <span class="menubar-apple">&#xF8FF;</span>
+  <span class="menubar-item" style="font-weight:700;color:rgba(255,255,255,0.85)">Code</span>
+  <span class="menubar-item">File</span>
+  <span class="menubar-item">Edit</span>
+  <span class="menubar-item">Terminal</span>
+  <div class="menubar-right">
+    <span class="menubar-right-item">main ⎇</span>
+    <span class="menubar-right-item">Ln 47, Col 12</span>
+    <span class="menubar-right-item">06:12</span>
+  </div>
+</div>
+
+<!-- VS Code Layout -->
+<div class="vscode">
+  <!-- Sidebar icons -->
+  <div class="sidebar">
+    <div class="sidebar-icon active">📁</div>
+    <div class="sidebar-icon">🔍</div>
+    <div class="sidebar-icon">⎇</div>
+    <div class="sidebar-icon">🔌</div>
+  </div>
+
+  <!-- File tree -->
+  <div class="file-tree">
+    <div class="tree-section">Explorer</div>
+    <div class="tree-item" style="padding-left:8px;font-size:10px;color:rgba(255,255,255,0.2)">▼ AUTH-SYSTEM</div>
+    <div class="tree-item modified">
+      <span class="tree-item-icon">📄</span>
+      auth.service.ts
+      <span class="tree-dot modified"></span>
+    </div>
+    <div class="tree-item active">
+      <span class="tree-item-icon">📄</span>
+      jwt.middleware.ts
+      <span class="tree-dot modified"></span>
+    </div>
+    <div class="tree-item new-file">
+      <span class="tree-item-icon">📄</span>
+      refresh.handler.ts
+      <span class="tree-dot new-file"></span>
+    </div>
+    <div class="tree-item">
+      <span class="tree-item-icon">📄</span>
+      auth.controller.ts
+    </div>
+    <div class="tree-item">
+      <span class="tree-item-icon">📄</span>
+      auth.module.ts
+    </div>
+    <div class="tree-item" style="color:rgba(255,255,255,0.2);padding-left:8px;font-size:10px;margin-top:8px">▼ TESTS</div>
+    <div class="tree-item new-file">
+      <span class="tree-item-icon">🧪</span>
+      auth.spec.ts
+      <span class="tree-dot new-file"></span>
+    </div>
+    <div class="tree-item" style="color:rgba(255,255,255,0.2);padding-left:8px;font-size:10px;margin-top:8px">▼ CONFIG</div>
+    <div class="tree-item">
+      <span class="tree-item-icon">⚙️</span>
+      env.config.ts
+    </div>
+  </div>
+
+  <!-- Editor -->
+  <div class="editor-main">
+    <div class="tabs">
+      <div class="tab">auth.service.ts <span class="tab-dot"></span></div>
+      <div class="tab active">jwt.middleware.ts <span class="tab-dot"></span></div>
+      <div class="tab">refresh.handler.ts</div>
+    </div>
+    <div class="code-editor">
+      <div class="code-line"><span class="line-num">1</span><span class="kw">import</span> <span class="op">{ </span><span class="tp">Injectable</span><span class="op">, </span><span class="tp">UnauthorizedException</span><span class="op"> }</span> <span class="kw">from</span> <span class="str">'@nestjs/common'</span><span class="op">;</span></div>
+      <div class="code-line"><span class="line-num">2</span><span class="kw">import</span> <span class="op">{ </span><span class="tp">JwtService</span><span class="op"> }</span> <span class="kw">from</span> <span class="str">'@nestjs/jwt'</span><span class="op">;</span></div>
+      <div class="code-line"><span class="line-num">3</span><span class="cm">// JWT middleware — validates Bearer tokens on protected routes</span></div>
+      <div class="code-line"><span class="line-num">4</span></div>
+      <div class="code-line highlight-line"><span class="line-num">5</span><span class="op">@</span><span class="fn">Injectable</span><span class="op">()</span></div>
+      <div class="code-line highlight-line"><span class="line-num">6</span><span class="kw">export class</span> <span class="tp">JwtMiddleware</span> <span class="kw">implements</span> <span class="tp">NestMiddleware</span> <span class="op">{</span></div>
+      <div class="code-line"><span class="line-num">7</span>  <span class="kw">constructor</span><span class="op">(</span><span class="kw">private</span> <span class="kw">readonly</span> <span class="pl">jwtService</span><span class="op">:</span> <span class="tp">JwtService</span><span class="op">) {}</span></div>
+      <div class="code-line"><span class="line-num">8</span></div>
+      <div class="code-line"><span class="line-num">9</span>  <span class="kw">async</span> <span class="fn">use</span><span class="op">(</span><span class="pl">req</span><span class="op">:</span> <span class="tp">Request</span><span class="op">,</span> <span class="pl">res</span><span class="op">:</span> <span class="tp">Response</span><span class="op">,</span> <span class="fn">next</span><span class="op">:</span> <span class="tp">NextFunction</span><span class="op">) {</span></div>
+      <div class="code-line"><span class="line-num">10</span>    <span class="kw">const</span> <span class="pl">token</span> <span class="op">=</span> <span class="kw">this</span><span class="op">.</span><span class="fn">extractToken</span><span class="op">(</span><span class="pl">req</span><span class="op">);</span></div>
+      <div class="code-line"><span class="line-num">11</span>    <span class="kw">if</span> <span class="op">(!</span><span class="pl">token</span><span class="op">)</span> <span class="kw">throw new</span> <span class="tp">UnauthorizedException</span><span class="op">();</span></div>
+      <div class="code-line"><span class="line-num">12</span></div>
+      <div class="code-line"><span class="line-num">13</span>    <span class="kw">try</span> <span class="op">{</span></div>
+      <div class="code-line highlight-line"><span class="line-num">14</span>      <span class="kw">const</span> <span class="pl">payload</span> <span class="op">=</span> <span class="kw">await</span> <span class="kw">this</span><span class="op">.</span><span class="pl">jwtService</span><span class="op">.</span><span class="fn">verifyAsync</span><span class="op">(</span><span class="pl">token</span><span class="op">);</span></div>
+      <div class="code-line highlight-line"><span class="line-num">15</span>      <span class="pl">req</span><span class="op">[</span><span class="str">'user'</span><span class="op">]</span> <span class="op">=</span> <span class="pl">payload</span><span class="op">;</span></div>
+      <div class="code-line"><span class="line-num">16</span>      <span class="fn">next</span><span class="op">();</span></div>
+      <div class="code-line"><span class="line-num">17</span>    <span class="op">}</span> <span class="kw">catch</span> <span class="op">{</span></div>
+      <div class="code-line"><span class="line-num">18</span>      <span class="kw">throw new</span> <span class="tp">UnauthorizedException</span><span class="op">(</span><span class="str">'Invalid token'</span><span class="op">);</span></div>
+      <div class="code-line"><span class="line-num">19</span>    <span class="op">}</span></div>
+      <div class="code-line"><span class="line-num">20</span>  <span class="op">}</span></div>
+    </div>
+    <div class="terminal-panel">
+      <div class="terminal-tabs">
+        <span class="term-tab active">Terminal</span>
+        <span class="term-tab">Output</span>
+        <span class="term-tab">Problems <span style="color:#ff7b72;margin-left:4px">0</span></span>
+      </div>
+      <div class="terminal-body">
+        <div class="term-line cmd">$ claude 'build JWT auth system with refresh token rotation'</div>
+        <div class="term-line agent">◆ Claude Code  analyzing codebase structure...</div>
+        <div class="term-line agent">◆ Reading: auth.module.ts, auth.service.ts</div>
+        <div class="term-line agent">◆ Writing: jwt.middleware.ts (+84 lines)</div>
+        <div class="term-line agent">◆ Writing: refresh.handler.ts (new file)</div>
+        <div class="term-line agent">◆ Writing: auth.spec.ts (new file)</div>
+        <div class="term-line" id="termCurrentLine">◆ Running: <span style="color:#7ee787">npx jest auth.spec.ts</span> <span class="term-cursor"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ THE ISLAND ══════════════ -->
+<div class="island-wrap">
+  <div class="island s-active" id="island">
+    <div class="done-flash" id="doneFlash"></div>
+
+    <!-- Single agent row (active) -->
+    <div id="view-single">
+      <div class="agent-row" id="singleRow" onclick="togglePeek()">
+        <div class="status-dot active" id="statusDot"></div>
+        <div class="agent-badge">
+          <div class="agent-logo claude">C</div>
+          <span class="agent-name">Claude Code</span>
+        </div>
+        <div class="agent-status">
+          <span class="status-text" id="statusText">
+            <span class="thinking-dots" id="thinkingDots"><span></span><span></span><span></span></span>
+          </span>
+          <span class="status-text" id="actionText" style="color:rgba(255,255,255,0.55)">running tests</span>
+        </div>
+        <div class="agent-stats">
+          <span class="stat-chip files" id="filesChip">5 files</span>
+          <span class="stat-chip time" id="timeChip">12:43</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Multi-agent view (hidden by default) -->
+    <div id="view-multi" style="display:none">
+      <div class="agent-row" onclick="togglePeek()">
+        <div class="status-dot active"></div>
+        <div class="agent-badge">
+          <div class="agent-logo claude">C</div>
+          <span class="agent-name">Claude Code</span>
+        </div>
+        <div class="agent-status">
+          <span class="status-text thinking-text" style="display:flex;align-items:center;gap:6px">
+            <span class="thinking-dots"><span></span><span></span><span></span></span>
+            <span style="font-size:11px">editing auth.service.ts</span>
+          </span>
+        </div>
+        <div class="agent-stats">
+          <span class="stat-chip files">8 files</span>
+          <span class="stat-chip time">8:21</span>
+        </div>
+      </div>
+      <div class="row-divider"></div>
+      <div class="agent-row">
+        <div class="status-dot idle"></div>
+        <div class="agent-badge">
+          <div class="agent-logo codex">G</div>
+          <span class="agent-name">Codex</span>
+        </div>
+        <div class="agent-status">
+          <span class="status-text">waiting for input</span>
+        </div>
+        <div class="agent-stats">
+          <span class="stat-chip files">3 files</span>
+          <span class="stat-chip time">2:14</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Peek card -->
+    <div class="peek" id="peek">
+      <div class="peek-header">
+        <div class="peek-header-stat">Task <span class="peek-header-val" style="color:rgba(255,255,255,0.55);font-family:'SF Mono',monospace;font-size:10px">JWT auth + refresh token rotation</span></div>
+        <div class="peek-header-stat" style="margin-left:auto">
+          <span style="color:rgba(110,216,127,0.7)">+</span><span class="peek-header-val" style="color:rgba(110,216,127,0.8)">284</span>
+          &nbsp;<span style="color:rgba(255,123,114,0.7)">-</span><span class="peek-header-val" style="color:rgba(255,123,114,0.8)">12</span>
+        </div>
+      </div>
+
+      <div class="tool-timeline">
+        <div class="tool-call success">
+          <span class="tool-icon">✓</span>
+          <span class="tool-name">read_file</span>
+          <span class="tool-arg path">auth.module.ts</span>
+          <span class="tool-time">0.1s</span>
+        </div>
+        <div class="tool-call success">
+          <span class="tool-icon">✓</span>
+          <span class="tool-name">read_file</span>
+          <span class="tool-arg path">auth.service.ts</span>
+          <span class="tool-time">0.1s</span>
+        </div>
+        <div class="tool-call success">
+          <span class="tool-icon">✓</span>
+          <span class="tool-name">write_file</span>
+          <span class="tool-arg path">jwt.middleware.ts <span style="color:rgba(110,216,127,0.6)">+84</span></span>
+          <span class="tool-time">0.3s</span>
+        </div>
+        <div class="tool-call success">
+          <span class="tool-icon">✓</span>
+          <span class="tool-name">write_file</span>
+          <span class="tool-arg path">refresh.handler.ts <span style="color:rgba(110,216,127,0.6)">+112</span></span>
+          <span class="tool-time">0.4s</span>
+        </div>
+        <div class="tool-call success">
+          <span class="tool-icon">✓</span>
+          <span class="tool-name">write_file</span>
+          <span class="tool-arg path">auth.spec.ts <span style="color:rgba(110,216,127,0.6)">+88</span></span>
+          <span class="tool-time">0.3s</span>
+        </div>
+        <div class="tool-call running" id="currentToolCall">
+          <span class="tool-icon" style="color:#d2a8ff">◆</span>
+          <span class="tool-name">run_bash</span>
+          <span class="tool-arg bash">npx jest auth.spec.ts</span>
+          <span class="tool-time" style="color:#d2a8ff">…</span>
+        </div>
+      </div>
+
+      <div class="diff-summary" id="diffSummary">
+        <div class="diff-file">
+          <span class="diff-filename">jwt.middleware.ts</span>
+          <span class="diff-add">+84</span>
+        </div>
+        <div class="diff-file">
+          <span class="diff-filename">refresh.handler.ts</span>
+          <span class="diff-add">+112</span>
+          <span class="diff-del">-0</span>
+        </div>
+        <div class="diff-file">
+          <span class="diff-filename">auth.spec.ts</span>
+          <span class="diff-add">+88</span>
+        </div>
+        <div class="diff-file">
+          <span class="diff-filename">auth.service.ts</span>
+          <span class="diff-add">+12</span>
+          <span class="diff-del">-8</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <span class="ctrl-label">Scenario</span>
+  <button class="ctrl-btn active" id="btn-active" onclick="setScenario('active')">● Active</button>
+  <button class="ctrl-btn" id="btn-thinking" onclick="setScenario('thinking')">◆ Thinking</button>
+  <button class="ctrl-btn" id="btn-done" onclick="setScenario('done')">✓ Done</button>
+  <button class="ctrl-btn" id="btn-error" onclick="setScenario('error')">✗ Error</button>
+  <button class="ctrl-btn" id="btn-idle" onclick="setScenario('idle')">○ Idle</button>
+  <div class="ctrl-divider"></div>
+  <button class="ctrl-btn" id="btn-multi" onclick="setScenario('multi')">⚡ Multi-agent</button>
+  <div class="ctrl-divider"></div>
+  <button class="ctrl-btn" onclick="togglePeek()">Peek card</button>
+</div>
+
+<script>
+  let currentScenario = 'active';
+  let peekOpen = false;
+  let timerInterval;
+  let elapsed = 12 * 60 + 43;
+
+  // Timer
+  function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      elapsed++;
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      const chip = document.getElementById('timeChip');
+      if (chip) chip.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    }, 1000);
+  }
+  startTimer();
+
+  function setScenario(s) {
+    currentScenario = s;
+    const island = document.getElementById('island');
+    const dot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const actionText = document.getElementById('actionText');
+    const filesChip = document.getElementById('filesChip');
+    const timeChip = document.getElementById('timeChip');
+    const termLine = document.getElementById('termCurrentLine');
+    const doneFlash = document.getElementById('doneFlash');
+    const thinkingDots = document.getElementById('thinkingDots');
+
+    // Clear buttons
+    document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('btn-' + s)?.classList.add('active');
+
+    // Hide multi, show single
+    document.getElementById('view-single').style.display = 'block';
+    document.getElementById('view-multi').style.display = 'none';
+
+    // Clear island states
+    island.className = 'island';
+
+    // Reset status text
+    thinkingDots.style.display = 'none';
+    actionText.style.display = '';
+
+    if (s === 'active') {
+      island.classList.add('s-active');
+      dot.className = 'status-dot active';
+      thinkingDots.style.display = 'inline-flex';
+      actionText.textContent = 'running tests';
+      actionText.className = 'status-text';
+      filesChip.textContent = '5 files';
+      filesChip.className = 'stat-chip files';
+      timeChip.className = 'stat-chip time';
+      elapsed = 12 * 60 + 43;
+      startTimer();
+      document.getElementById('currentToolCall').className = 'tool-call running';
+      document.getElementById('currentToolCall').innerHTML = `<span class="tool-icon" style="color:#d2a8ff">◆</span><span class="tool-name">run_bash</span><span class="tool-arg bash">npx jest auth.spec.ts</span><span class="tool-time" style="color:#d2a8ff">…</span>`;
+      termLine.innerHTML = `◆ Running: <span style="color:#7ee787">npx jest auth.spec.ts</span> <span class="term-cursor"></span>`;
+    }
+    else if (s === 'thinking') {
+      island.classList.add('s-active');
+      dot.className = 'status-dot thinking';
+      thinkingDots.style.display = 'inline-flex';
+      actionText.textContent = 'planning changes';
+      actionText.className = 'status-text thinking-text';
+      filesChip.textContent = '5 files';
+      termLine.innerHTML = `◆ Thinking... <span class="term-cursor"></span>`;
+    }
+    else if (s === 'done') {
+      island.classList.add('s-done');
+      dot.className = 'status-dot done';
+      actionText.textContent = '✓  done · 5 files · all tests pass';
+      actionText.className = 'status-text done-text';
+      filesChip.textContent = '5 files';
+      filesChip.className = 'stat-chip done';
+      clearInterval(timerInterval);
+      // Flash animation
+      doneFlash.className = 'done-flash';
+      void doneFlash.offsetWidth;
+      doneFlash.classList.add('flash');
+      document.getElementById('currentToolCall').className = 'tool-call success';
+      document.getElementById('currentToolCall').innerHTML = `<span class="tool-icon">✓</span><span class="tool-name">run_bash</span><span class="tool-arg" style="color:rgba(110,216,127,0.8)">6 tests passed</span><span class="tool-time">2.4s</span>`;
+      termLine.innerHTML = `<span style="color:#7ee787">✓  6 passed  (auth.spec.ts)</span>`;
+    }
+    else if (s === 'error') {
+      island.classList.add('s-error');
+      dot.className = 'status-dot error';
+      actionText.textContent = '✗  exit 1 · auth.spec.ts:42';
+      actionText.className = 'status-text error-text';
+      filesChip.textContent = '5 files';
+      filesChip.className = 'stat-chip err';
+      clearInterval(timerInterval);
+      document.getElementById('currentToolCall').className = 'tool-call fail';
+      document.getElementById('currentToolCall').innerHTML = `<span class="tool-icon" style="color:#ff7b72">✗</span><span class="tool-name">run_bash</span><span class="tool-arg error">TypeError: jwtService.verifyAsync is not a function</span><span class="tool-time">1.1s</span>`;
+      termLine.innerHTML = `<span style="color:#ff7b72">✗  FAIL  auth.spec.ts</span><br><span style="color:rgba(255,123,114,0.6)">  TypeError: jwtService.verifyAsync is not a function (line 42)</span>`;
+    }
+    else if (s === 'idle') {
+      island.classList.add('s-idle');
+      dot.className = 'status-dot idle';
+      actionText.textContent = 'no active agents';
+      actionText.className = 'status-text';
+      filesChip.style.display = 'none';
+      clearInterval(timerInterval);
+      termLine.innerHTML = `<span class="term-cursor"></span>`;
+    }
+    else if (s === 'multi') {
+      island.classList.add('s-multi');
+      document.getElementById('view-single').style.display = 'none';
+      document.getElementById('view-multi').style.display = 'block';
+      clearInterval(timerInterval);
+    }
+
+    filesChip.style.display = s === 'idle' ? 'none' : '';
+  }
+
+  function togglePeek() {
+    peekOpen = !peekOpen;
+    const peek = document.getElementById('peek');
+    peek.classList.toggle('open', peekOpen);
+  }
+
+  // Click outside to close peek
+  document.addEventListener('click', (e) => {
+    const island = document.getElementById('island');
+    if (!island.contains(e.target) && peekOpen) {
+      peekOpen = false;
+      document.getElementById('peek').classList.remove('open');
+    }
+  });
+</script>
+
+</body>
+</html>
