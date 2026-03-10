@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Desktop Island — Dev v3</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      background: #0d1117;
+      overflow: hidden;
+      height: 100vh; width: 100vw;
+      user-select: none;
+    }
+
+    /* ── Menubar ── */
+    .menubar {
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 28px;
+      background: rgba(10,12,18,0.98);
+      backdrop-filter: blur(20px);
+      display: flex; align-items: center;
+      padding: 0 16px; gap: 20px;
+      z-index: 100;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .menubar-apple { font-size: 13px; color: rgba(255,255,255,0.8); }
+    .menubar-item { font-size: 13px; color: rgba(255,255,255,0.4); font-weight: 500; }
+    .menubar-right { margin-left: auto; display: flex; gap: 16px; align-items: center; }
+    .menubar-right-item { font-size: 11px; color: rgba(255,255,255,0.3); font-family: 'SF Mono', monospace; }
+
+    /* ── Changes panel (left) ── */
+    .changes-panel {
+      position: absolute;
+      left: 0; top: 28px; bottom: 0;
+      width: 260px;
+      background: rgba(10,12,18,0.98);
+      border-right: 1px solid rgba(255,255,255,0.05);
+      padding: 18px 14px;
+      overflow-y: auto;
+      z-index: 50;
+    }
+    .changes-panel::-webkit-scrollbar { width: 3px; }
+    .changes-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+    .panel-title {
+      font-size: 9px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      color: rgba(255,255,255,0.2);
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .change-item {
+      margin-bottom: 14px;
+    }
+
+    .change-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: rgba(110,216,127,0.15);
+      color: rgba(110,216,127,0.8);
+      font-size: 9px; font-weight: 800;
+      margin-bottom: 5px;
+    }
+
+    .change-title {
+      font-size: 11px; font-weight: 700;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 3px;
+    }
+
+    .change-desc {
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      line-height: 1.55;
+    }
+
+    .change-persona {
+      font-size: 9px;
+      color: rgba(110,216,127,0.5);
+      margin-top: 4px;
+      font-style: italic;
+    }
+
+    .change-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.04);
+      margin: 12px 0;
+    }
+
+    /* ── Editor ── */
+    .editor-area {
+      position: absolute;
+      left: 260px; right: 0; top: 28px; bottom: 0;
+      display: flex; flex-direction: column;
+    }
+
+    .tabs-bar {
+      height: 34px;
+      background: #161b22;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex; align-items: flex-end; padding: 0 8px;
+    }
+    .tab {
+      height: 30px; padding: 0 14px;
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: rgba(255,255,255,0.35);
+      border-right: 1px solid rgba(255,255,255,0.04);
+    }
+    .tab.active { background: #0d1117; color: rgba(255,255,255,0.7); }
+    .tab-dot { width: 6px; height: 6px; border-radius: 50%; background: #e2c97e; }
+
+    .code-body {
+      flex: 1; padding: 14px 0; overflow: hidden;
+    }
+    .cl {
+      display: flex;
+      font-family: 'SF Mono', 'Menlo', monospace;
+      font-size: 12px; line-height: 1.85;
+      padding: 0 16px 0 48px; position: relative;
+    }
+    .ln { position: absolute; left: 0; width: 40px; text-align: right; color: rgba(255,255,255,0.14); font-size: 11px; padding-right: 10px; }
+    .cl.hl { background: rgba(255,255,255,0.025); }
+    .kw { color: #ff7b72; } .fn { color: #d2a8ff; } .str { color: #a5d6ff; }
+    .cm { color: rgba(255,255,255,0.18); } .tp { color: #79c0ff; }
+    .op { color: rgba(255,255,255,0.4); } .pl { color: #ffa657; }
+
+    /* ═══════════════════════════
+       ISLAND v3
+    ═══════════════════════════ */
+    .island-wrap {
+      position: absolute;
+      top: 36px;
+      left: calc(260px + 50%);
+      transform: translateX(-50%);
+      z-index: 1000;
+    }
+
+    .island {
+      position: relative;
+      background: rgba(10,12,18,0.95);
+      backdrop-filter: blur(40px) saturate(180%);
+      border-radius: 22px;
+      border: 1.5px solid rgba(255,255,255,0.07);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+      min-width: 500px;
+      transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    /* Signal states */
+    .island.s-go    { border-color: rgba(110,216,127,0.28); box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 24px rgba(110,216,127,0.08); }
+    .island.s-wait  { border-color: rgba(251,191,36,0.35); box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 24px rgba(251,191,36,0.1); }
+    .island.s-scope { border-color: rgba(251,191,36,0.4); box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 24px rgba(251,191,36,0.12); }
+    .island.s-error { border-color: rgba(255,123,114,0.45); box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 28px rgba(255,123,114,0.15); }
+    .island.s-done  { border-color: rgba(110,216,127,0.5); box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 36px rgba(110,216,127,0.18); }
+    .island.s-multi { border-color: rgba(165,210,255,0.25); box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 20px rgba(165,210,255,0.08); }
+
+    /* ── Main row ── */
+    .main-row {
+      display: flex; align-items: center;
+      height: 48px; padding: 0 8px; gap: 4px;
+    }
+
+    /* Signal pill */
+    .sig-pill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 11px 4px 8px;
+      border-radius: 13px;
+      flex-shrink: 0;
+      transition: all 0.3s;
+    }
+    .sig-pill.go    { background: rgba(110,216,127,0.1); }
+    .sig-pill.wait  { background: rgba(251,191,36,0.1); }
+    .sig-pill.scope { background: rgba(251,191,36,0.1); }
+    .sig-pill.error { background: rgba(255,123,114,0.1); }
+    .sig-pill.done  { background: rgba(110,216,127,0.14); }
+    .sig-pill.idle  { background: rgba(255,255,255,0.04); }
+
+    .sig-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .sig-dot.go    { background: #6ed87f; animation: p-go 2.5s infinite; }
+    .sig-dot.wait  { background: #fbbf24; animation: p-amb 1.8s infinite; }
+    .sig-dot.scope { background: #fbbf24; animation: p-amb 1.8s infinite; }
+    .sig-dot.error { background: #ff7b72; animation: p-red 1.4s infinite; }
+    .sig-dot.done  { background: #6ed87f; }
+    .sig-dot.idle  { background: rgba(255,255,255,0.18); }
+
+    @keyframes p-go  { 0%,100%{box-shadow:0 0 0 0 rgba(110,216,127,.5)} 50%{box-shadow:0 0 0 5px rgba(110,216,127,0)} }
+    @keyframes p-amb { 0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.5)}  50%{box-shadow:0 0 0 5px rgba(251,191,36,0)} }
+    @keyframes p-red { 0%,100%{box-shadow:0 0 0 0 rgba(255,123,114,.6)} 50%{box-shadow:0 0 0 6px rgba(255,123,114,0)} }
+
+    .sig-label {
+      font-size: 10px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .sig-label.go    { color: rgba(110,216,127,.85); }
+    .sig-label.wait  { color: rgba(251,191,36,.85); }
+    .sig-label.scope { color: rgba(251,191,36,.85); }
+    .sig-label.error { color: rgba(255,123,114,.85); }
+    .sig-label.done  { color: rgba(110,216,127,.9); }
+    .sig-label.idle  { color: rgba(255,255,255,.25); }
+
+    /* ── Session label (NEW v3) ── */
+    .session-label {
+      display: flex; align-items: center; gap: 7px;
+      padding: 4px 10px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+      cursor: default;
+      transition: background 0.15s;
+    }
+    .session-label:hover { background: rgba(255,255,255,0.07); }
+
+    .agent-logo {
+      width: 18px; height: 18px; border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 800; flex-shrink: 0;
+    }
+    .logo-claude { background: linear-gradient(135deg,#cc785c,#d4956a); color: #fff; }
+    .logo-codex  { background: linear-gradient(135deg,#10a37f,#1ab394); color: #fff; }
+    .logo-cursor { background: linear-gradient(135deg,#5865f2,#7289da); color: #fff; }
+
+    .session-repo {
+      font-size: 11px; font-weight: 700;
+      color: rgba(255,255,255,0.55);
+      font-family: 'SF Mono', monospace;
+    }
+
+    /* ── Current action ── */
+    .cur-action {
+      flex: 1; display: flex; align-items: center; gap: 7px;
+      padding: 4px 8px; border-radius: 10px;
+      transition: background 0.15s; cursor: pointer; min-width: 0;
+    }
+    .cur-action:hover { background: rgba(255,255,255,0.04); }
+
+    .act-verb {
+      font-size: 10px; font-family: 'SF Mono', monospace;
+      color: rgba(255,255,255,0.28); flex-shrink: 0;
+    }
+    .act-file {
+      font-size: 12px; font-family: 'SF Mono', monospace;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .act-file.go-c    { color: rgba(110,216,127,.75); }
+    .act-file.wait-c  { color: rgba(251,191,36,.8); }
+    .act-file.scope-c { color: rgba(251,191,36,.8); }
+    .act-file.error-c { color: rgba(255,123,114,.85); }
+    .act-file.done-c  { color: rgba(110,216,127,.9); font-weight: 600; }
+
+    .vdiv { width:1px; height:18px; background:rgba(255,255,255,0.07); flex-shrink:0; margin:0 4px; }
+
+    /* ══ SCOPE BLOCK v3 — deviation display ══ */
+    .scope-block {
+      position: relative;
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 10px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .scope-block:hover { background: rgba(255,255,255,0.07); }
+    .scope-block:hover .scope-hover-card { display: block; }
+
+    .scope-nums {
+      display: flex; flex-direction: column; gap: 1px;
+    }
+    .scope-count {
+      font-size: 12px; font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-family: 'SF Mono', monospace;
+      line-height: 1;
+    }
+    .scope-delta {
+      font-size: 9px; font-weight: 700;
+      font-family: 'SF Mono', monospace;
+      letter-spacing: 0.2px;
+    }
+
+    .scope-bar-wrap {
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .scope-bar {
+      width: 32px; height: 3px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 2px; overflow: hidden;
+    }
+    .scope-fill {
+      height: 100%; border-radius: 2px;
+      transition: width 0.6s ease, background 0.4s ease;
+    }
+    .scope-label-text {
+      font-size: 8px; color: rgba(255,255,255,0.2);
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+
+    /* Scope hover card — file list (NEW v3) */
+    .scope-hover-card {
+      display: none;
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(12,14,22,0.97);
+      backdrop-filter: blur(30px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 10px;
+      min-width: 240px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.7);
+      z-index: 2000;
+      animation: fadeIn 0.15s ease;
+    }
+    @keyframes fadeIn { from{opacity:0;transform:translateX(-50%) translateY(-4px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+
+    .scope-card-title {
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: rgba(255,255,255,0.25);
+      margin-bottom: 8px; padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .scope-file-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 6px; border-radius: 6px;
+      transition: background 0.1s; margin-bottom: 2px;
+    }
+    .scope-file-row:hover { background: rgba(255,255,255,0.04); }
+
+    .sf-icon { font-size: 10px; flex-shrink: 0; }
+    .sf-name {
+      font-size: 11px; font-family: 'SF Mono', monospace;
+      color: rgba(255,255,255,0.6); flex: 1;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sf-name.unexpected { color: rgba(251,191,36,0.75); }
+    .sf-delta { font-size: 10px; font-family: 'SF Mono', monospace; flex-shrink: 0; }
+    .sf-delta.add { color: rgba(110,216,127,0.65); }
+    .sf-delta.unexpected { color: rgba(251,191,36,0.7); }
+    .sf-delta.del { color: rgba(255,123,114,0.65); }
+
+    .scope-card-footer {
+      margin-top: 8px; padding-top: 6px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      font-size: 9px; color: rgba(255,255,255,0.2);
+    }
+
+    /* ── Git block ── */
+    .git-block {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 10px; border-radius: 10px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0; margin-left: 4px;
+    }
+    .git-label { font-size: 9px; color: rgba(255,255,255,0.2); font-weight: 600; }
+    .git-val {
+      font-size: 10px; font-family: 'SF Mono', monospace; font-weight: 700;
+    }
+    .git-val.safe  { color: rgba(110,216,127,.6); }
+    .git-val.stale { color: rgba(251,191,36,.65); }
+
+    /* Timer */
+    .timer { font-size: 11px; font-family: 'SF Mono', monospace; color: rgba(255,255,255,.2); padding: 0 8px; flex-shrink: 0; }
+
+    /* ══ NOTIFICATION BADGE v3 ══ */
+    .notif-badge {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 10px;
+      background: rgba(251,191,36,0.08);
+      border: 1px solid rgba(251,191,36,0.2);
+      flex-shrink: 0;
+      animation: fadeIn 0.2s ease;
+    }
+    .notif-icon { font-size: 11px; }
+    .notif-text { font-size: 10px; font-weight: 700; color: rgba(251,191,36,0.75); }
+
+    /* ══ TRUST BADGE v3 ══ */
+    .trust-badge {
+      position: absolute;
+      bottom: -10px;
+      right: 16px;
+      display: flex; align-items: center; gap: 5px;
+      padding: 2px 8px;
+      background: rgba(10,12,18,0.95);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 20px;
+      cursor: pointer;
+    }
+    .trust-badge:hover .trust-tooltip { display: block; }
+    .trust-icon { font-size: 9px; color: rgba(255,255,255,.25); }
+    .trust-text { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: rgba(255,255,255,.2); }
+
+    .trust-tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      right: 0;
+      background: rgba(12,14,22,0.97);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 10px 12px;
+      min-width: 220px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      line-height: 1.6;
+      z-index: 3000;
+      box-shadow: 0 12px 40px rgba(0,0,0,.7);
+      animation: fadeIn 0.15s ease;
+    }
+    .trust-tooltip strong { color: rgba(255,255,255,.8); font-size: 11px; display: block; margin-bottom: 4px; }
+    .trust-tooltip .tl { display: flex; gap: 6px; margin-bottom: 2px; }
+    .trust-tooltip .tl-dot { color: rgba(110,216,127,.6); flex-shrink: 0; }
+
+    /* ── Peek card ── */
+    .peek {
+      display: none; padding: 12px 10px 10px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      animation: fadeIn 0.2s ease;
+    }
+    .peek.open { display: block; }
+
+    .mission-row {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 9px 10px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.04);
+      margin-bottom: 10px;
+    }
+    .mission-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+    .mission-text { flex: 1; }
+    .mission-task { font-size: 11.5px; color: rgba(255,255,255,.65); font-weight: 500; line-height: 1.4; margin-bottom: 4px; }
+    .mission-meta { font-size: 10px; color: rgba(255,255,255,.25); display: flex; gap: 12px; }
+
+    .prog-wrap { height: 3px; background: rgba(255,255,255,.05); border-radius: 2px; margin-bottom: 10px; overflow: hidden; }
+    .prog-fill { height: 100%; border-radius: 2px; transition: width 1s ease, background 0.5s; }
+
+    .recent { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+    .ra {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 8px; border-radius: 7px;
+      font-family: 'SF Mono', monospace; font-size: 10.5px;
+    }
+    .ra.done { background: rgba(110,216,127,.04); }
+    .ra.running { background: rgba(210,168,255,.05); border: 1px solid rgba(210,168,255,.08); }
+    .ra.warn { background: rgba(251,191,36,.04); border: 1px solid rgba(251,191,36,.08); }
+    .ra-ic { flex-shrink: 0; }
+    .ra-vb { color: rgba(255,255,255,.28); width: 52px; flex-shrink: 0; }
+    .ra-pa { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ra-pa.g { color: rgba(110,216,127,.7); }
+    .ra-pa.p { color: rgba(210,168,255,.7); }
+    .ra-pa.a { color: rgba(251,191,36,.7); }
+    .ra-pa.r { color: rgba(255,123,114,.75); }
+    .ra-dt { color: rgba(255,255,255,.18); flex-shrink: 0; font-size: 10px; }
+
+    .btns { display: flex; gap: 7px; }
+    .abtn {
+      flex: 1; height: 32px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      gap: 5px; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all .15s; border: 1px solid;
+    }
+    .b-steer { background: rgba(210,168,255,.07); border-color: rgba(210,168,255,.18); color: rgba(210,168,255,.8); }
+    .b-steer:hover { background: rgba(210,168,255,.13); }
+    .b-pause { background: rgba(251,191,36,.07); border-color: rgba(251,191,36,.18); color: rgba(251,191,36,.8); }
+    .b-pause:hover { background: rgba(251,191,36,.13); }
+    .b-rollback { background: rgba(255,123,114,.06); border-color: rgba(255,123,114,.14); color: rgba(255,123,114,.7); }
+    .b-rollback:hover { background: rgba(255,123,114,.11); }
+    .b-approve { flex: 2; background: rgba(110,216,127,.1); border-color: rgba(110,216,127,.25); color: rgba(110,216,127,.9); }
+    .b-approve:hover { background: rgba(110,216,127,.16); }
+    .b-review { flex: 2; background: rgba(110,216,127,.1); border-color: rgba(110,216,127,.25); color: rgba(110,216,127,.9); font-size: 13px; }
+
+    /* ── Multi rows ── */
+    .multi-rows { display: flex; flex-direction: column; }
+    .mrow {
+      display: flex; align-items: center; gap: 4px;
+      height: 42px; padding: 0 8px;
+      cursor: pointer; border-radius: 12px; transition: background .15s;
+    }
+    .mrow:hover { background: rgba(255,255,255,.03); }
+    .mrow-div { height: 1px; background: rgba(255,255,255,.04); margin: 0 8px; }
+
+    /* Done flash */
+    .flash-ring {
+      position: absolute; inset: -2px; border-radius: 24px;
+      border: 2px solid rgba(110,216,127,.7);
+      opacity: 0; pointer-events: none;
+    }
+    .flash-ring.flash { animation: flashout .8s ease-out forwards; }
+    @keyframes flashout { 0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(1.04)} }
+
+    /* ── Controls ── */
+    .controls {
+      position: fixed; bottom: 16px;
+      left: calc(260px + 50%); transform: translateX(-50%);
+      background: rgba(10,12,18,.97); backdrop-filter: blur(20px);
+      border-radius: 12px; border: 1px solid rgba(255,255,255,.07);
+      padding: 8px 12px; display: flex; gap: 6px; z-index: 500; align-items: center;
+    }
+    .ctrl-l { font-size: 9px; color: rgba(255,255,255,.18); text-transform: uppercase; letter-spacing: .5px; margin-right: 2px; }
+    .cbtn {
+      padding: 5px 10px; border-radius: 7px;
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.07);
+      color: rgba(255,255,255,.4); font-size: 11px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap;
+    }
+    .cbtn:hover { background: rgba(255,255,255,.09); color: rgba(255,255,255,.7); }
+    .cbtn.active { background: rgba(110,216,127,.1); border-color: rgba(110,216,127,.25); color: #6ed87f; }
+    .cdiv { width: 1px; height: 17px; background: rgba(255,255,255,.07); }
+  </style>
+</head>
+<body>
+
+<!-- Menubar -->
+<div class="menubar">
+  <span class="menubar-apple">&#xF8FF;</span>
+  <span class="menubar-item" style="font-weight:700;color:rgba(255,255,255,.8)">Code</span>
+  <span class="menubar-item">File</span><span class="menubar-item">View</span><span class="menubar-item">Terminal</span>
+  <div class="menubar-right">
+    <span class="menubar-right-item">feat/auth ⎇</span>
+    <span class="menubar-right-item">06:45</span>
+  </div>
+</div>
+
+<!-- Changes panel -->
+<div class="changes-panel">
+  <div class="panel-title">v3 — Research-driven changes</div>
+
+  <div class="change-item">
+    <div class="change-num">1</div>
+    <div class="change-title">Scope deviation, not raw count</div>
+    <div class="change-desc">Shows "+7 above expected" rather than just "12 files." Baseline from git history. Turns a number into a signal.</div>
+    <div class="change-persona">↳ Priya, Mia: false positives on raw count</div>
+  </div>
+
+  <div class="change-divider"></div>
+
+  <div class="change-item">
+    <div class="change-num">2</div>
+    <div class="change-title">"What files?" hover on scope bar</div>
+    <div class="change-desc">Hover the scope block → file list with +/- deltas. Unexpected files highlighted amber. Transforms count into intelligence.</div>
+    <div class="change-persona">↳ Brendan: "I want the list, not just the count"</div>
+  </div>
+
+  <div class="change-divider"></div>
+
+  <div class="change-item">
+    <div class="change-num">3</div>
+    <div class="change-title">Session labels</div>
+    <div class="change-desc">Each agent row shows repo/task name. Multi-agent view distinguishes ClientA from ClientB. Prevents file crossover.</div>
+    <div class="change-persona">↳ Isabella: "which Claude is on which client?" Yuki: 3 instances</div>
+  </div>
+
+  <div class="change-divider"></div>
+
+  <div class="change-item">
+    <div class="change-num">4</div>
+    <div class="change-title">WAIT escapes the HUD</div>
+    <div class="change-desc">WAIT state fires a macOS notification + shows "🔔 notified" badge in the island. Catches people not looking at the screen.</div>
+    <div class="change-persona">↳ Jamie, Dana, Taylor: "I never look at the menu bar area"</div>
+  </div>
+
+  <div class="change-divider"></div>
+
+  <div class="change-item">
+    <div class="change-num">5</div>
+    <div class="change-title">Trust badge</div>
+    <div class="change-desc">Persistent "local-only · open source" badge below island. Hover for full privacy explanation. Answers Raj's threat model question before he asks.</div>
+    <div class="change-persona">↳ Raj: "What's the threat model for pgrep reading my process list?"</div>
+  </div>
+</div>
+
+<!-- Editor -->
+<div class="editor-area">
+  <div class="tabs-bar">
+    <div class="tab">auth.service.ts <span class="tab-dot"></span></div>
+    <div class="tab active">refresh.handler.ts <span class="tab-dot"></span></div>
+    <div class="tab">auth.spec.ts</div>
+  </div>
+  <div class="code-body">
+    <div class="cl"><span class="ln">1</span><span class="kw">import</span> <span class="op">{ </span><span class="tp">Injectable</span><span class="op"> }</span> <span class="kw">from</span> <span class="str">'@nestjs/common'</span><span class="op">;</span></div>
+    <div class="cl"><span class="ln">2</span><span class="kw">import</span> <span class="op">{ </span><span class="tp">JwtService</span><span class="op"> }</span> <span class="kw">from</span> <span class="str">'@nestjs/jwt'</span><span class="op">;</span></div>
+    <div class="cl"><span class="ln">3</span><span class="cm">// Refresh token handler — Claude writing now</span></div>
+    <div class="cl"><span class="ln">4</span></div>
+    <div class="cl hl"><span class="ln">5</span><span class="op">@</span><span class="fn">Injectable</span><span class="op">()</span></div>
+    <div class="cl hl"><span class="ln">6</span><span class="kw">export class</span> <span class="tp">RefreshHandler</span> <span class="op">{</span></div>
+    <div class="cl"><span class="ln">7</span>  <span class="kw">constructor</span><span class="op">(</span><span class="kw">private</span> <span class="pl">jwtService</span><span class="op">:</span> <span class="tp">JwtService</span><span class="op">) {}</span></div>
+    <div class="cl"><span class="ln">8</span></div>
+    <div class="cl hl"><span class="ln">9</span>  <span class="kw">async</span> <span class="fn">rotate</span><span class="op">(</span><span class="pl">token</span><span class="op">:</span> <span class="kw">string</span><span class="op">) {</span></div>
+    <div class="cl hl"><span class="ln">10</span>    <span class="kw">const</span> <span class="pl">payload</span> <span class="op">=</span> <span class="kw">await</span> <span class="kw">this</span><span class="op">.</span><span class="pl">jwtService</span><span class="op">.</span><span class="fn">verifyAsync</span><span class="op">(</span><span class="pl">token</span><span class="op">);</span></div>
+    <div class="cl"><span class="ln">11</span>    <span class="cm">// ▌ writing token rotation logic...</span></div>
+    <div class="cl"><span class="ln">12</span>  <span class="op">}</span></div>
+    <div class="cl"><span class="ln">13</span><span class="op">}</span></div>
+  </div>
+</div>
+
+<!-- ═══════════ ISLAND v3 ═══════════ -->
+<div class="island-wrap">
+  <div class="island s-go" id="island">
+    <div class="flash-ring" id="flashRing"></div>
+
+    <!-- Single view -->
+    <div id="singleView">
+      <div class="main-row" id="mainRow">
+
+        <!-- Signal -->
+        <div class="sig-pill go" id="sigPill">
+          <div class="sig-dot go" id="sigDot"></div>
+          <span class="sig-label go" id="sigLabel">GO</span>
+        </div>
+
+        <!-- Session label (v3 NEW) -->
+        <div class="session-label" id="sessionLabel" style="margin: 0 6px;">
+          <div class="agent-logo logo-claude" id="agentLogo">C</div>
+          <span class="session-repo" id="sessionRepo">auth-system</span>
+        </div>
+
+        <!-- Current action -->
+        <div class="cur-action" id="curAction" onclick="togglePeek()">
+          <span class="act-verb" id="actVerb">writing</span>
+          <span class="act-file go-c" id="actFile">refresh.handler.ts</span>
+        </div>
+
+        <div class="vdiv"></div>
+
+        <!-- Scope block v3 — deviation display + hover file list -->
+        <div class="scope-block" id="scopeBlock">
+          <div class="scope-nums">
+            <div class="scope-count" id="scopeCount" style="color:rgba(110,216,127,.75)">5</div>
+            <div class="scope-delta" id="scopeDelta" style="color:rgba(255,255,255,.2)">on track</div>
+          </div>
+          <div class="scope-bar-wrap">
+            <div class="scope-bar">
+              <div class="scope-fill" id="scopeFill" style="width:33%;background:rgba(110,216,127,.55)"></div>
+            </div>
+            <div class="scope-label-text">scope</div>
+          </div>
+
+          <!-- Hover file list (v3 NEW) -->
+          <div class="scope-hover-card" id="scopeHoverCard">
+            <div class="scope-card-title">Files touched this session</div>
+            <div id="fileList">
+              <div class="scope-file-row">
+                <span class="sf-icon">📝</span>
+                <span class="sf-name">auth.module.ts</span>
+                <span class="sf-delta add">+3</span>
+              </div>
+              <div class="scope-file-row">
+                <span class="sf-icon">📝</span>
+                <span class="sf-name">auth.service.ts</span>
+                <span class="sf-delta add">+12</span>
+              </div>
+              <div class="scope-file-row">
+                <span class="sf-icon">📝</span>
+                <span class="sf-name">jwt.middleware.ts</span>
+                <span class="sf-delta add">+84</span>
+              </div>
+              <div class="scope-file-row">
+                <span class="sf-icon">🆕</span>
+                <span class="sf-name">auth.spec.ts</span>
+                <span class="sf-delta add">+88</span>
+              </div>
+              <div class="scope-file-row">
+                <span class="sf-icon">✏️</span>
+                <span class="sf-name">refresh.handler.ts</span>
+                <span class="sf-delta add">…</span>
+              </div>
+            </div>
+            <div class="scope-card-footer">Expected: ~5 files for this task type</div>
+          </div>
+        </div>
+
+        <!-- Notification badge for WAIT (hidden by default, v3 NEW) -->
+        <div class="notif-badge" id="notifBadge" style="display:none; margin-left:4px;">
+          <span class="notif-icon">🔔</span>
+          <span class="notif-text">Notified</span>
+        </div>
+
+        <!-- Git safety -->
+        <div class="git-block" id="gitBlock">
+          <span class="git-label">↩</span>
+          <span class="git-val safe" id="gitVal">safe</span>
+        </div>
+
+        <!-- Timer -->
+        <div class="timer" id="timer">18:32</div>
+
+      </div>
+    </div>
+
+    <!-- Multi-agent view (v3 — with session labels) -->
+    <div id="multiView" style="display:none">
+      <div class="multi-rows">
+        <div class="mrow" onclick="togglePeek()">
+          <div class="sig-pill go" style="margin-right:6px">
+            <div class="sig-dot go"></div>
+            <span class="sig-label go" style="font-size:9px">GO</span>
+          </div>
+          <div class="session-label" style="padding:3px 8px;margin-right:6px">
+            <div class="agent-logo logo-claude" style="width:16px;height:16px;font-size:9px">C</div>
+            <span class="session-repo" style="font-size:10px">auth-system</span>
+          </div>
+          <div class="cur-action" style="padding:2px 6px">
+            <span class="act-verb" style="font-size:10px">writing</span>
+            <span class="act-file go-c" style="font-size:11px">refresh.handler.ts</span>
+          </div>
+          <div class="scope-block" style="padding:4px 8px">
+            <div class="scope-nums">
+              <div class="scope-count" style="font-size:11px;color:rgba(110,216,127,.7)">5</div>
+              <div class="scope-delta" style="font-size:8px;color:rgba(255,255,255,.2)">on track</div>
+            </div>
+          </div>
+          <div class="timer" style="font-size:10px;padding:0 6px">18:32</div>
+        </div>
+
+        <div class="mrow-div"></div>
+
+        <div class="mrow">
+          <div class="sig-pill wait" style="margin-right:6px">
+            <div class="sig-dot wait"></div>
+            <span class="sig-label wait" style="font-size:9px">WAIT</span>
+          </div>
+          <div class="session-label" style="padding:3px 8px;margin-right:6px">
+            <div class="agent-logo logo-claude" style="width:16px;height:16px;font-size:9px">C</div>
+            <span class="session-repo" style="font-size:10px">frontend-app</span>
+          </div>
+          <div class="cur-action" style="padding:2px 6px">
+            <span class="act-verb" style="font-size:10px;color:rgba(255,255,255,.2)">asking</span>
+            <span class="act-file wait-c" style="font-size:11px">ok to overwrite Login.tsx?</span>
+          </div>
+          <div class="notif-badge" style="margin-left:4px;padding:3px 7px">
+            <span class="notif-icon" style="font-size:10px">🔔</span>
+            <span class="notif-text" style="font-size:9px">Notified</span>
+          </div>
+          <div class="timer" style="font-size:10px;padding:0 6px">4:10</div>
+        </div>
+
+        <div class="mrow-div"></div>
+
+        <div class="mrow">
+          <div class="sig-pill idle" style="margin-right:6px">
+            <div class="sig-dot idle"></div>
+            <span class="sig-label idle" style="font-size:9px">IDLE</span>
+          </div>
+          <div class="session-label" style="padding:3px 8px;margin-right:6px">
+            <div class="agent-logo logo-codex" style="width:16px;height:16px;font-size:9px">G</div>
+            <span class="session-repo" style="font-size:10px">data-pipeline</span>
+          </div>
+          <div class="cur-action" style="padding:2px 6px">
+            <span class="act-file" style="font-size:11px;color:rgba(255,255,255,.3)">awaiting input</span>
+          </div>
+          <div class="timer" style="font-size:10px;padding:0 6px">2:05</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Peek card -->
+    <div class="peek" id="peek">
+      <div class="mission-row">
+        <div class="mission-icon" id="missionIcon">⚡</div>
+        <div class="mission-text">
+          <div class="mission-task" id="missionTask">Build JWT auth system with refresh token rotation and session revocation</div>
+          <div class="mission-meta">
+            <span>🕐 <span id="mTime">18:32</span></span>
+            <span>📁 <span id="mScope">5 files</span></span>
+            <span id="mGit">↩ committed 4m ago</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prog-wrap">
+        <div class="prog-fill" id="progFill" style="width:65%;background:linear-gradient(90deg,rgba(110,216,127,.4),rgba(110,216,127,.7))"></div>
+      </div>
+
+      <div class="recent" id="recentList">
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">read</span><span class="ra-pa g">auth.module.ts, auth.service.ts</span><span class="ra-dt">2 files</span></div>
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">write</span><span class="ra-pa g">jwt.middleware.ts</span><span class="ra-dt">+84</span></div>
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">write</span><span class="ra-pa g">auth.spec.ts</span><span class="ra-dt">+88</span></div>
+        <div class="ra running"><span class="ra-ic" style="color:#d2a8ff;animation:p-go 1.2s infinite">◆</span><span class="ra-vb">write</span><span class="ra-pa p">refresh.handler.ts</span><span class="ra-dt" style="color:#d2a8ff">…</span></div>
+      </div>
+
+      <div class="btns" id="actionBtns">
+        <div class="abtn b-steer">✦ Steer</div>
+        <div class="abtn b-pause">⏸ Pause</div>
+        <div class="abtn b-rollback">↩ Rollback</div>
+      </div>
+    </div>
+
+  </div><!-- /island -->
+
+  <!-- Trust badge (v3 NEW) -->
+  <div class="trust-badge">
+    <span class="trust-icon">🔒</span>
+    <span class="trust-text">local-only · open source</span>
+    <div class="trust-tooltip">
+      <strong>How it works</strong>
+      <div class="tl"><span class="tl-dot">✓</span> Reads only: pgrep output + git status</div>
+      <div class="tl"><span class="tl-dot">✓</span> No network calls, no telemetry, ever</div>
+      <div class="tl"><span class="tl-dot">✓</span> All data stays on your machine</div>
+      <div class="tl"><span class="tl-dot">✓</span> Open source — verify the source yourself</div>
+      <div style="margin-top:6px;font-size:10px;color:rgba(255,255,255,.2)">github.com/desktop-island/app</div>
+    </div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <span class="ctrl-l">State</span>
+  <button class="cbtn active" id="btn-go"    onclick="set('go')">🟢 GO</button>
+  <button class="cbtn" id="btn-wait"          onclick="set('wait')">🟡 WAIT</button>
+  <button class="cbtn" id="btn-scope"         onclick="set('scope')">📈 Scope</button>
+  <button class="cbtn" id="btn-error"         onclick="set('error')">🔴 Error</button>
+  <button class="cbtn" id="btn-done"          onclick="set('done')">✓ Done</button>
+  <div class="cdiv"></div>
+  <button class="cbtn" id="btn-multi"         onclick="set('multi')">⚡ Multi (3 agents)</button>
+  <div class="cdiv"></div>
+  <button class="cbtn"                        onclick="togglePeek()">Peek</button>
+</div>
+
+<script>
+  let peekOpen = false;
+  let secs = 18*60+32;
+  let tick;
+
+  function startTimer() {
+    clearInterval(tick);
+    tick = setInterval(() => {
+      secs++;
+      const t = `${Math.floor(secs/60)}:${(secs%60).toString().padStart(2,'0')}`;
+      const el = document.getElementById('timer');
+      const mt = document.getElementById('mTime');
+      if(el) el.textContent = t;
+      if(mt) mt.textContent = t;
+    }, 1000);
+  }
+  startTimer();
+
+  function set(s) {
+    document.querySelectorAll('.cbtn').forEach(b => b.classList.remove('active'));
+    document.getElementById('btn-'+s)?.classList.add('active');
+
+    const island = document.getElementById('island');
+    const sigPill = document.getElementById('sigPill');
+    const sigDot  = document.getElementById('sigDot');
+    const sigLabel= document.getElementById('sigLabel');
+    const actVerb = document.getElementById('actVerb');
+    const actFile = document.getElementById('actFile');
+    const scopeCount = document.getElementById('scopeCount');
+    const scopeDelta = document.getElementById('scopeDelta');
+    const scopeFill  = document.getElementById('scopeFill');
+    const gitVal  = document.getElementById('gitVal');
+    const notifBadge = document.getElementById('notifBadge');
+    const flashRing  = document.getElementById('flashRing');
+    const recentList = document.getElementById('recentList');
+    const actionBtns = document.getElementById('actionBtns');
+    const progFill   = document.getElementById('progFill');
+    const missionTask= document.getElementById('missionTask');
+    const mScope     = document.getElementById('mScope');
+    const mGit       = document.getElementById('mGit');
+    const fileList   = document.getElementById('fileList');
+
+    document.getElementById('singleView').style.display = 'block';
+    document.getElementById('multiView').style.display = 'none';
+    island.className = 'island';
+    notifBadge.style.display = 'none';
+
+    if (s==='go') {
+      island.classList.add('s-go');
+      sigPill.className='sig-pill go'; sigDot.className='sig-dot go';
+      sigLabel.className='sig-label go'; sigLabel.textContent='GO';
+      actVerb.textContent='writing';
+      actFile.className='act-file go-c'; actFile.textContent='refresh.handler.ts';
+      scopeCount.textContent='5'; scopeCount.style.color='rgba(110,216,127,.75)';
+      scopeDelta.textContent='on track'; scopeDelta.style.color='rgba(255,255,255,.2)';
+      scopeFill.style.width='33%'; scopeFill.style.background='rgba(110,216,127,.55)';
+      gitVal.textContent='safe'; gitVal.className='git-val safe';
+      progFill.style.width='65%'; progFill.style.background='linear-gradient(90deg,rgba(110,216,127,.4),rgba(110,216,127,.7))';
+      fileList.innerHTML = `
+        <div class="scope-file-row"><span class="sf-icon">📝</span><span class="sf-name">auth.module.ts</span><span class="sf-delta add">+3</span></div>
+        <div class="scope-file-row"><span class="sf-icon">📝</span><span class="sf-name">auth.service.ts</span><span class="sf-delta add">+12</span></div>
+        <div class="scope-file-row"><span class="sf-icon">📝</span><span class="sf-name">jwt.middleware.ts</span><span class="sf-delta add">+84</span></div>
+        <div class="scope-file-row"><span class="sf-icon">🆕</span><span class="sf-name">auth.spec.ts</span><span class="sf-delta add">+88</span></div>
+        <div class="scope-file-row"><span class="sf-icon">✏️</span><span class="sf-name">refresh.handler.ts</span><span class="sf-delta add">…</span></div>`;
+      document.getElementById('scopeHoverCard').querySelector('.scope-card-footer').textContent='Expected: ~5 files for this task type';
+      missionTask.textContent='Build JWT auth system with refresh token rotation and session revocation';
+      mScope.textContent='5 files'; mGit.innerHTML='↩ committed 4m ago';
+      recentList.innerHTML = `
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">read</span><span class="ra-pa g">auth.module.ts, auth.service.ts</span><span class="ra-dt">2 files</span></div>
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">write</span><span class="ra-pa g">jwt.middleware.ts</span><span class="ra-dt">+84</span></div>
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">write</span><span class="ra-pa g">auth.spec.ts</span><span class="ra-dt">+88</span></div>
+        <div class="ra running"><span class="ra-ic" style="color:#d2a8ff">◆</span><span class="ra-vb">write</span><span class="ra-pa p">refresh.handler.ts</span><span class="ra-dt" style="color:#d2a8ff">…</span></div>`;
+      actionBtns.innerHTML=`<div class="abtn b-steer">✦ Steer</div><div class="abtn b-pause">⏸ Pause</div><div class="abtn b-rollback">↩ Rollback</div>`;
+      secs=18*60+32; startTimer();
+    }
+    else if (s==='wait') {
+      island.classList.add('s-wait');
+      sigPill.className='sig-pill wait'; sigDot.className='sig-dot wait';
+      sigLabel.className='sig-label wait'; sigLabel.textContent='WAIT';
+      actVerb.textContent='asking';
+      actFile.className='act-file wait-c'; actFile.textContent='ok to overwrite auth.service.ts?';
+      scopeCount.textContent='5'; scopeCount.style.color='rgba(255,255,255,.5)';
+      scopeDelta.textContent='on track'; scopeDelta.style.color='rgba(255,255,255,.2)';
+      scopeFill.style.width='33%'; scopeFill.style.background='rgba(255,255,255,.2)';
+      gitVal.textContent='safe'; gitVal.className='git-val safe';
+      notifBadge.style.display='flex';
+      clearInterval(tick);
+      recentList.innerHTML=`
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">read</span><span class="ra-pa g">auth.module.ts</span><span class="ra-dt">1 file</span></div>
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">write</span><span class="ra-pa g">jwt.middleware.ts</span><span class="ra-dt">+84</span></div>
+        <div class="ra warn"><span class="ra-ic" style="color:#fbbf24">?</span><span class="ra-vb">prompt</span><span class="ra-pa a">Waiting: ok to overwrite auth.service.ts?</span></div>`;
+      actionBtns.innerHTML=`<div class="abtn b-approve" style="flex:2">✓ Approve</div><div class="abtn b-pause">✕ Skip</div>`;
+      progFill.style.width='50%';
+      missionTask.textContent='Build JWT auth system with refresh token rotation and session revocation';
+    }
+    else if (s==='scope') {
+      island.classList.add('s-scope');
+      sigPill.className='sig-pill scope'; sigDot.className='sig-dot scope';
+      sigLabel.className='sig-label scope'; sigLabel.textContent='SCOPE';
+      actVerb.textContent='writing';
+      actFile.className='act-file scope-c'; actFile.textContent='user.service.ts  ← unexpected';
+      scopeCount.textContent='14'; scopeCount.style.color='rgba(251,191,36,.85)';
+      scopeDelta.textContent='+9 over'; scopeDelta.style.color='rgba(251,191,36,.7)';
+      scopeFill.style.width='92%'; scopeFill.style.background='rgba(251,191,36,.65)';
+      gitVal.textContent='11m ago'; gitVal.className='git-val stale';
+      clearInterval(tick);
+      fileList.innerHTML=`
+        <div class="scope-file-row"><span class="sf-icon">📝</span><span class="sf-name">auth.module.ts</span><span class="sf-delta add">+3</span></div>
+        <div class="scope-file-row"><span class="sf-icon">📝</span><span class="sf-name">jwt.middleware.ts</span><span class="sf-delta add">+84</span></div>
+        <div class="scope-file-row"><span class="sf-icon">📝</span><span class="sf-name">auth.spec.ts</span><span class="sf-delta add">+88</span></div>
+        <div class="scope-file-row"><span class="sf-icon">⚠️</span><span class="sf-name unexpected">user.service.ts</span><span class="sf-delta unexpected">+47 !</span></div>
+        <div class="scope-file-row"><span class="sf-icon">⚠️</span><span class="sf-name unexpected">user.repository.ts</span><span class="sf-delta unexpected">+31 !</span></div>
+        <div class="scope-file-row"><span class="sf-icon">⚠️</span><span class="sf-name unexpected">role.guard.ts</span><span class="sf-delta unexpected">+22 !</span></div>`;
+      document.getElementById('scopeHoverCard').querySelector('.scope-card-footer').innerHTML='<span style="color:rgba(251,191,36,.6)">⚠ 3 files outside auth/ directory</span>  ·  Expected: ~5 files';
+      missionTask.textContent='JWT auth — now touching user/, role/ — scope expanding beyond original task';
+      mScope.textContent='14 files'; mGit.innerHTML='<span style="color:rgba(251,191,36,.6)">↩ stale — 11m ago</span>';
+      recentList.innerHTML=`
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">write</span><span class="ra-pa g">jwt.middleware.ts</span><span class="ra-dt">+84</span></div>
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">write</span><span class="ra-pa g">auth.spec.ts</span><span class="ra-dt">+88</span></div>
+        <div class="ra warn"><span class="ra-ic" style="color:#fbbf24">⚠</span><span class="ra-vb">write</span><span class="ra-pa a">user.service.ts  (outside scope)</span><span class="ra-dt" style="color:#fbbf24">+47</span></div>
+        <div class="ra running"><span class="ra-ic" style="color:#d2a8ff">◆</span><span class="ra-vb">write</span><span class="ra-pa a">role.guard.ts</span><span class="ra-dt" style="color:#fbbf24">…</span></div>`;
+      progFill.style.width='50%'; progFill.style.background='rgba(251,191,36,.4)';
+      actionBtns.innerHTML=`<div class="abtn b-steer" style="flex:2">✦ Redirect scope</div><div class="abtn b-rollback">↩ Rollback</div>`;
+    }
+    else if (s==='error') {
+      island.classList.add('s-error');
+      sigPill.className='sig-pill error'; sigDot.className='sig-dot error';
+      sigLabel.className='sig-label error'; sigLabel.textContent='ERROR';
+      actVerb.textContent='failed';
+      actFile.className='act-file error-c'; actFile.textContent='auth.spec.ts:42 · TypeError';
+      scopeCount.textContent='5'; scopeCount.style.color='rgba(255,255,255,.5)';
+      scopeDelta.textContent='on track'; scopeDelta.style.color='rgba(255,255,255,.2)';
+      scopeFill.style.width='33%'; scopeFill.style.background='rgba(255,255,255,.2)';
+      gitVal.textContent='safe'; gitVal.className='git-val safe';
+      clearInterval(tick);
+      recentList.innerHTML=`
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">write</span><span class="ra-pa g">refresh.handler.ts</span><span class="ra-dt">+112</span></div>
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">write</span><span class="ra-pa g">auth.spec.ts</span><span class="ra-dt">+88</span></div>
+        <div class="ra" style="background:rgba(255,123,114,.05);border:1px solid rgba(255,123,114,.1)"><span class="ra-ic" style="color:#ff7b72">✗</span><span class="ra-vb">run</span><span class="ra-pa r">TypeError: jwtService.verifyAsync not a function</span></div>`;
+      actionBtns.innerHTML=`<div class="abtn b-steer" style="flex:2">✦ Fix with Claude</div><div class="abtn b-rollback">↩ Rollback</div>`;
+      progFill.style.width='65%'; progFill.style.background='rgba(255,123,114,.35)';
+    }
+    else if (s==='done') {
+      island.classList.add('s-done');
+      sigPill.className='sig-pill done'; sigDot.className='sig-dot done';
+      sigLabel.className='sig-label done'; sigLabel.textContent='DONE';
+      actVerb.textContent='';
+      actFile.className='act-file done-c'; actFile.textContent='✓ 6 tests passed · 5 files · ready to commit';
+      scopeCount.textContent='5'; scopeCount.style.color='rgba(110,216,127,.8)';
+      scopeDelta.textContent='on track'; scopeDelta.style.color='rgba(110,216,127,.5)';
+      scopeFill.style.width='33%'; scopeFill.style.background='rgba(110,216,127,.7)';
+      gitVal.textContent='commit ready'; gitVal.className='git-val safe';
+      clearInterval(tick);
+      flashRing.className='flash-ring';
+      void flashRing.offsetWidth;
+      flashRing.classList.add('flash');
+      recentList.innerHTML=`
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">write</span><span class="ra-pa g">refresh.handler.ts</span><span class="ra-dt">+112</span></div>
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">write</span><span class="ra-pa g">auth.spec.ts</span><span class="ra-dt">+88</span></div>
+        <div class="ra done"><span class="ra-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="ra-vb">tests</span><span class="ra-pa g">6/6 passed · 0 failures</span><span class="ra-dt">2.4s</span></div>`;
+      actionBtns.innerHTML=`<div class="abtn b-review">↩ Review changes</div><div class="abtn b-rollback">✕ Rollback all</div>`;
+      progFill.style.width='100%'; progFill.style.background='rgba(110,216,127,.75)';
+      mGit.innerHTML='↩ ready to commit';
+    }
+    else if (s==='multi') {
+      island.classList.add('s-multi');
+      document.getElementById('singleView').style.display='none';
+      document.getElementById('multiView').style.display='block';
+      clearInterval(tick);
+    }
+
+    if(peekOpen) { peekOpen=false; document.getElementById('peek').classList.remove('open'); }
+  }
+
+  function togglePeek() {
+    peekOpen = !peekOpen;
+    document.getElementById('peek').classList.toggle('open', peekOpen);
+  }
+
+  document.addEventListener('click', e => {
+    const isl = document.getElementById('island');
+    if(!isl.contains(e.target) && peekOpen) {
+      peekOpen=false;
+      document.getElementById('peek').classList.remove('open');
+    }
+  });
+
+  // Scope creep animation on GO state
+  let scopeTick = 5;
+  setInterval(() => {
+    if(document.getElementById('btn-go')?.classList.contains('active') && Math.random()<0.12) {
+      scopeTick++;
+      const sc = document.getElementById('scopeCount');
+      const sf = document.getElementById('scopeFill');
+      if(sc) sc.textContent = scopeTick;
+      if(sf) sf.style.width = Math.min(scopeTick*6.5,100)+'%';
+    }
+  }, 3000);
+</script>
+
+</body>
+</html>
