@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Desktop Island v7 — Your desktop's nervous system</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      background: #1a1a2e;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      user-select: none;
+    }
+
+    /* ── Desktop Background ── */
+    .desktop {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(160deg, #0f0f1a 0%, #1a1a2e 40%, #16213e 100%);
+    }
+
+    .wallpaper-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* ── Fake Menu Bar ── */
+    .menubar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 28px;
+      background: rgba(20,20,30,0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 20px;
+      z-index: 100;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .menubar-apple {
+      font-size: 13px;
+      color: rgba(255,255,255,0.85);
+    }
+
+    .menubar-items {
+      display: flex;
+      gap: 18px;
+    }
+
+    .menubar-item {
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+      font-weight: 500;
+    }
+
+    .menubar-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .menubar-right-item {
+      font-size: 12px;
+      color: rgba(255,255,255,0.6);
+    }
+
+    /* ── Fake App Windows ── */
+    .window {
+      position: absolute;
+      background: rgba(30,32,44,0.92);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(30px);
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .window-titlebar {
+      height: 38px;
+      background: rgba(40,42,58,0.9);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .traffic-light {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+    }
+    .tl-red { background: #ff5f57; }
+    .tl-yellow { background: #febc2e; }
+    .tl-green { background: #28c840; }
+
+    .window-title {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      margin-left: 8px;
+    }
+
+    .window-content {
+      padding: 20px;
+    }
+
+    .code-line {
+      font-family: 'SF Mono', 'Menlo', monospace;
+      font-size: 12px;
+      line-height: 1.8;
+      color: rgba(255,255,255,0.35);
+    }
+
+    .code-line.highlight { color: #7dd3fc; }
+    .code-line.comment { color: rgba(255,255,255,0.2); }
+    .code-line.string { color: #86efac; }
+    .code-line.keyword { color: #c084fc; }
+
+    .window-1 {
+      left: 40px;
+      top: 55px;
+      width: 540px;
+      height: 420px;
+    }
+
+    .window-2 {
+      right: 40px;
+      top: 55px;
+      width: 480px;
+      height: 360px;
+    }
+
+    .window-3 {
+      left: 180px;
+      bottom: 30px;
+      width: 700px;
+      height: 240px;
+    }
+
+    .browser-bar {
+      height: 36px;
+      background: rgba(50,52,70,0.9);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .url-bar {
+      flex: 1;
+      background: rgba(255,255,255,0.06);
+      border-radius: 6px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* ── THE ISLAND ── */
+    .island-wrap {
+      position: absolute;
+      top: 38px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    .island {
+      position: relative;
+      background: rgba(18,18,24,0.88);
+      backdrop-filter: blur(40px) saturate(180%);
+      -webkit-backdrop-filter: blur(40px) saturate(180%);
+      border-radius: 22px;
+      padding: 0 20px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      border: 1.5px solid rgba(255,255,255,0.1);
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      cursor: default;
+      min-width: 480px;
+      box-shadow:
+        0 8px 32px rgba(0,0,0,0.4),
+        0 0 0 0px rgba(74,222,128,0);
+    }
+
+    /* State classes */
+    .island.state-focus {
+      border-color: rgba(74,222,128,0.35);
+      box-shadow:
+        0 8px 32px rgba(0,0,0,0.4),
+        0 0 20px rgba(74,222,128,0.12);
+    }
+
+    .island.state-meeting {
+      border-color: rgba(251,191,36,0.4);
+      box-shadow:
+        0 8px 32px rgba(0,0,0,0.4),
+        0 0 20px rgba(251,191,36,0.15);
+    }
+
+    .island.state-np {
+      border-color: var(--np-color, rgba(192,132,252,0.4));
+      box-shadow:
+        0 8px 32px rgba(0,0,0,0.4),
+        0 0 24px var(--np-glow, rgba(192,132,252,0.15));
+    }
+
+    .island.expanded {
+      border-radius: 18px;
+      padding-bottom: 12px;
+      height: auto;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0;
+    }
+
+    .island-main-row {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      height: 44px;
+      width: 100%;
+    }
+
+    /* Divider */
+    .divider {
+      width: 1px;
+      height: 18px;
+      background: rgba(255,255,255,0.12);
+      flex-shrink: 0;
+    }
+
+    /* ── Island Blocks ── */
+    .block {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 10px;
+      transition: background 0.15s ease;
+      position: relative;
+    }
+
+    .block:hover {
+      background: rgba(255,255,255,0.06);
+    }
+
+    .block-icon {
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .block-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .block-value {
+      font-size: 13px;
+      color: rgba(255,255,255,0.9);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .block-value.up { color: #4ade80; }
+    .block-value.down { color: #f87171; }
+    .block-value.dim { color: rgba(255,255,255,0.5); }
+
+    /* Focus block */
+    .focus-block {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .focus-ring-wrap {
+      position: relative;
+      width: 26px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+
+    .focus-ring-bg {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2.5px solid rgba(255,255,255,0.1);
+    }
+
+    .focus-ring-svg {
+      position: absolute;
+      inset: 0;
+      transform: rotate(-90deg);
+    }
+
+    .focus-ring-progress {
+      stroke-dasharray: 69.1;
+      stroke-dashoffset: 20;
+      stroke: #4ade80;
+      stroke-width: 2.5;
+      fill: none;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear;
+    }
+
+    .focus-text {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.9);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.3px;
+    }
+
+    .focus-label {
+      font-size: 11px;
+      color: rgba(74,222,128,0.8);
+      font-weight: 500;
+    }
+
+    /* Now Playing */
+    .np-block {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 0;
+      overflow: hidden;
+      transition: max-width 0.4s ease, opacity 0.4s ease, padding 0.4s ease;
+      opacity: 0;
+    }
+
+    .np-block.visible {
+      max-width: 200px;
+      opacity: 1;
+    }
+
+    .np-art {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+    }
+
+    .np-info {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .np-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.85);
+      white-space: nowrap;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .np-artist {
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      white-space: nowrap;
+    }
+
+    /* Add card button */
+    .add-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+      transition: all 0.15s ease;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .add-btn:hover {
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.7);
+    }
+
+    /* ── Peek Cards ── */
+    .peek-card {
+      display: none;
+      padding: 12px 4px 4px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      margin-top: 4px;
+      animation: peekIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    .peek-card.visible {
+      display: block;
+    }
+
+    @keyframes peekIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Focus peek */
+    .focus-peek {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      padding: 4px 0;
+    }
+
+    .peek-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 10px;
+    }
+
+    .peek-stat-label {
+      font-size: 10px;
+      color: rgba(255,255,255,0.35);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .peek-stat-value {
+      font-size: 15px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.85);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .peek-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .peek-btn {
+      flex: 1;
+      height: 30px;
+      border-radius: 8px;
+      background: rgba(74,222,128,0.12);
+      border: 1px solid rgba(74,222,128,0.2);
+      color: #4ade80;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .peek-btn:hover { background: rgba(74,222,128,0.2); }
+
+    .peek-btn.secondary {
+      background: rgba(255,255,255,0.05);
+      border-color: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.5);
+    }
+
+    /* Weather peek */
+    .weather-peek {
+      padding: 4px 0;
+    }
+
+    .weather-now {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding: 0 4px;
+    }
+
+    .weather-big-temp {
+      font-size: 32px;
+      font-weight: 300;
+      color: rgba(255,255,255,0.9);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .weather-detail {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .weather-condition {
+      font-size: 13px;
+      color: rgba(255,255,255,0.7);
+    }
+
+    .weather-rain {
+      font-size: 12px;
+      color: #60a5fa;
+      font-weight: 600;
+    }
+
+    .hourly-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .hourly-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      padding: 8px 4px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 8px;
+    }
+
+    .hourly-time { font-size: 10px; color: rgba(255,255,255,0.35); }
+    .hourly-icon { font-size: 14px; }
+    .hourly-temp { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.75); font-variant-numeric: tabular-nums; }
+
+    .rain-bar-wrap {
+      width: 100%;
+      height: 3px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .rain-bar {
+      height: 100%;
+      background: #60a5fa;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    /* Markets peek */
+    .markets-peek {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 4px 0;
+    }
+
+    .market-row {
+      display: flex;
+      align-items: center;
+      padding: 7px 10px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 9px;
+      gap: 10px;
+    }
+
+    .market-symbol {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.5);
+      width: 36px;
+      letter-spacing: 0.3px;
+    }
+
+    .market-price {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.85);
+      font-variant-numeric: tabular-nums;
+      flex: 1;
+    }
+
+    .market-change {
+      font-size: 12px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .market-change.up { color: #4ade80; }
+    .market-change.down { color: #f87171; }
+
+    .sparkline {
+      width: 50px;
+      height: 20px;
+    }
+
+    /* News peek */
+    .news-peek {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 4px 0;
+    }
+
+    .news-item {
+      display: flex;
+      gap: 10px;
+      padding: 8px 10px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 9px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .news-item:hover { background: rgba(255,255,255,0.07); }
+
+    .news-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.2);
+      width: 14px;
+      flex-shrink: 0;
+      padding-top: 1px;
+    }
+
+    .news-text {
+      flex: 1;
+    }
+
+    .news-headline {
+      font-size: 12px;
+      color: rgba(255,255,255,0.8);
+      line-height: 1.4;
+      font-weight: 500;
+    }
+
+    .news-meta {
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      margin-top: 3px;
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Card picker */
+    .card-picker {
+      display: none;
+      padding: 12px 4px 4px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      margin-top: 4px;
+      animation: peekIn 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    }
+
+    .card-picker.visible { display: block; }
+
+    .picker-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.25);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }
+
+    .picker-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .picker-card {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 10px;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.05);
+      transition: all 0.15s;
+    }
+
+    .picker-card:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.1);
+    }
+
+    .picker-card.added {
+      border-color: rgba(74,222,128,0.3);
+      background: rgba(74,222,128,0.06);
+    }
+
+    .picker-icon { font-size: 16px; }
+    .picker-name { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.75); }
+    .picker-setup { font-size: 10px; color: rgba(255,255,255,0.25); }
+    .picker-setup.instant { color: rgba(74,222,128,0.6); }
+    .picker-setup.quick { color: rgba(251,191,36,0.6); }
+
+    /* ── Command Palette ── */
+    .cmd-palette {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 520px;
+      background: rgba(22,22,32,0.96);
+      backdrop-filter: blur(40px);
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.7);
+      z-index: 2000;
+      overflow: hidden;
+      display: none;
+    }
+
+    .cmd-palette.visible { display: block; }
+
+    .cmd-input-wrap {
+      display: flex;
+      align-items: center;
+      padding: 16px 18px;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .cmd-icon {
+      font-size: 16px;
+      color: rgba(255,255,255,0.3);
+    }
+
+    .cmd-input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      color: rgba(255,255,255,0.85);
+      font-family: inherit;
+      caret-color: #4ade80;
+    }
+
+    .cmd-input::placeholder { color: rgba(255,255,255,0.25); }
+
+    .cmd-results {
+      padding: 8px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .cmd-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.2);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 8px 10px 4px;
+    }
+
+    .cmd-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .cmd-item:hover, .cmd-item.selected {
+      background: rgba(255,255,255,0.07);
+    }
+
+    .cmd-item-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: rgba(255,255,255,0.07);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .cmd-item-label { font-size: 13px; color: rgba(255,255,255,0.8); font-weight: 500; }
+    .cmd-item-desc { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+    .cmd-item-text { flex: 1; }
+
+    .cmd-kbd {
+      font-size: 10px;
+      color: rgba(255,255,255,0.25);
+      background: rgba(255,255,255,0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'SF Mono', monospace;
+    }
+
+    .cmd-footer {
+      padding: 10px 18px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      gap: 16px;
+    }
+
+    .cmd-hint {
+      font-size: 10px;
+      color: rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .cmd-hint kbd {
+      background: rgba(255,255,255,0.07);
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-family: 'SF Mono', monospace;
+    }
+
+    /* Overlay backdrop for palette */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(2px);
+      z-index: 1999;
+      display: none;
+    }
+
+    .overlay.visible { display: block; }
+
+    /* ── Controls (demo UI) ── */
+    .controls {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20,22,32,0.9);
+      backdrop-filter: blur(20px);
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+      z-index: 500;
+      align-items: center;
+    }
+
+    .ctrl-label {
+      font-size: 10px;
+      color: rgba(255,255,255,0.25);
+      margin-right: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .ctrl-btn {
+      padding: 5px 12px;
+      border-radius: 7px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.6);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+
+    .ctrl-btn:hover { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); }
+    .ctrl-btn.active {
+      background: rgba(74,222,128,0.15);
+      border-color: rgba(74,222,128,0.3);
+      color: #4ade80;
+    }
+
+    .ctrl-divider {
+      width: 1px;
+      height: 20px;
+      background: rgba(255,255,255,0.08);
+    }
+
+    /* State dot */
+    .state-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #4ade80;
+    }
+  </style>
+</head>
+<body>
+
+<div class="desktop">
+  <div class="wallpaper-grid"></div>
+</div>
+
+<!-- Menu bar -->
+<div class="menubar">
+  <span class="menubar-apple">&#xF8FF;</span>
+  <div class="menubar-items">
+    <span class="menubar-item" style="font-weight:700;color:rgba(255,255,255,0.9)">Finder</span>
+    <span class="menubar-item">File</span>
+    <span class="menubar-item">Edit</span>
+    <span class="menubar-item">View</span>
+    <span class="menubar-item">Go</span>
+  </div>
+  <div class="menubar-right">
+    <span class="menubar-right-item">📶</span>
+    <span class="menubar-right-item">🔋</span>
+    <span class="menubar-right-item">Mon 5:32 AM</span>
+  </div>
+</div>
+
+<!-- App windows -->
+<div class="window window-1">
+  <div class="window-titlebar">
+    <div class="traffic-light tl-red"></div>
+    <div class="traffic-light tl-yellow"></div>
+    <div class="traffic-light tl-green"></div>
+    <span class="window-title">ContentView.swift</span>
+  </div>
+  <div class="window-content">
+    <div class="code-line keyword">import SwiftUI</div>
+    <div class="code-line comment">// Island overlay — NSWindow level 102</div>
+    <div class="code-line">&nbsp;</div>
+    <div class="code-line keyword">struct <span style="color:#7dd3fc">IslandView</span>: <span style="color:#7dd3fc">View</span> {</div>
+    <div class="code-line highlight">  @StateObject var focus = FocusSession()</div>
+    <div class="code-line highlight">  @StateObject var weather = WeatherService()</div>
+    <div class="code-line">&nbsp;</div>
+    <div class="code-line">  var body: some <span class="keyword">View</span> {</div>
+    <div class="code-line">    HStack(spacing: 16) {</div>
+    <div class="code-line string">      FocusBlock(session: focus)</div>
+    <div class="code-line string">      WeatherBlock(service: weather)</div>
+    <div class="code-line string">      MarketsBlock()</div>
+    <div class="code-line">    }</div>
+    <div class="code-line comment">    .background(.ultraThinMaterial)</div>
+    <div class="code-line comment">    .cornerRadius(22)</div>
+    <div class="code-line">  }</div>
+    <div class="code-line">}</div>
+  </div>
+</div>
+
+<div class="window window-2">
+  <div class="window-titlebar">
+    <div class="traffic-light tl-red"></div>
+    <div class="traffic-light tl-yellow"></div>
+    <div class="traffic-light tl-green"></div>
+    <span class="window-title">Notion — Strategy</span>
+  </div>
+  <div class="window-content">
+    <div style="font-size:18px;font-weight:700;color:rgba(255,255,255,0.7);margin-bottom:16px">Desktop Island</div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.35);line-height:2">
+      <div>→ v7 mockup ✓</div>
+      <div>→ 5 sim rounds ✓</div>
+      <div>→ 100% install intent ✓</div>
+      <div>→ Hook locked ✓</div>
+      <div>→ <span style="color:rgba(74,222,128,0.7)">Build naked shell</span></div>
+      <div style="color:rgba(255,255,255,0.18)">→ First installs</div>
+      <div style="color:rgba(255,255,255,0.18)">→ Creator Pulse</div>
+    </div>
+  </div>
+</div>
+
+<div class="window window-3">
+  <div class="window-titlebar">
+    <div class="traffic-light tl-red"></div>
+    <div class="traffic-light tl-yellow"></div>
+    <div class="traffic-light tl-green"></div>
+    <span class="window-title">Terminal</span>
+  </div>
+  <div class="window-content" style="padding:12px 16px">
+    <div class="code-line comment">→ xcodebuild -project DesktopIsland.xcodeproj -scheme DesktopIsland</div>
+    <div class="code-line string">Build succeeded (0 errors, 0 warnings)</div>
+    <div class="code-line highlight">→ Weather: 69°F San Francisco · Rain in 22m</div>
+    <div class="code-line highlight">→ Focus session started: 25:00</div>
+    <div class="code-line comment">▌</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ THE ISLAND ═══════════════════════════════════ -->
+<div class="island-wrap">
+  <div class="island state-focus" id="island">
+    <div class="island-main-row" id="mainRow">
+
+      <!-- Focus Block -->
+      <div class="block focus-block" id="focusBlock" onclick="togglePeek('focus')">
+        <div class="focus-ring-wrap">
+          <div class="focus-ring-bg"></div>
+          <svg class="focus-ring-svg" viewBox="0 0 26 26">
+            <circle class="focus-ring-progress" id="focusRing" cx="13" cy="13" r="11"/>
+          </svg>
+        </div>
+        <div>
+          <div class="focus-text" id="focusTimer">23:41</div>
+          <div class="focus-label">Focus</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Weather Block -->
+      <div class="block" id="weatherBlock" onclick="togglePeek('weather')">
+        <span class="block-icon">🌤</span>
+        <span class="block-value">69°F</span>
+        <span class="block-label" id="weatherDetail">Rain in 22m</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Markets Block -->
+      <div class="block" id="marketsBlock" onclick="togglePeek('markets')">
+        <span class="block-icon" style="font-size:11px;font-weight:700;color:rgba(255,165,0,0.8)">₿</span>
+        <span class="block-value" id="btcPrice">84,230</span>
+        <span class="block-value up" style="font-size:11px">▲2.1%</span>
+      </div>
+
+      <div class="divider" id="npDivider" style="display:none"></div>
+
+      <!-- Now Playing (slides in) -->
+      <div class="np-block" id="npBlock">
+        <div class="np-art">🎵</div>
+        <div class="np-info">
+          <div class="np-title">Die With A Smile</div>
+          <div class="np-artist">Lady Gaga, Bruno Mars</div>
+        </div>
+      </div>
+
+      <!-- News inline hint -->
+      <div class="block" id="newsBlock" style="margin-left:4px" onclick="togglePeek('news')">
+        <span class="block-icon">📰</span>
+        <span class="block-label" style="max-width:120px;overflow:hidden;text-overflow:ellipsis">HN Top Stories</span>
+      </div>
+
+      <!-- Add card -->
+      <div class="add-btn" id="addBtn" onclick="togglePeek('picker')">+</div>
+
+    </div><!-- /mainRow -->
+
+    <!-- Focus peek -->
+    <div class="peek-card" id="peek-focus">
+      <div class="focus-peek">
+        <div class="peek-stat">
+          <div class="peek-stat-label">Session</div>
+          <div class="peek-stat-value">23:41</div>
+        </div>
+        <div class="peek-stat">
+          <div class="peek-stat-label">Today</div>
+          <div class="peek-stat-value">3h 20m</div>
+        </div>
+        <div class="peek-stat">
+          <div class="peek-stat-label">Streak</div>
+          <div class="peek-stat-value">6 days</div>
+        </div>
+      </div>
+      <div class="peek-actions">
+        <div class="peek-btn" onclick="togglePeek('focus')">⏸ Pause</div>
+        <div class="peek-btn secondary" onclick="togglePeek('focus')">Skip Break</div>
+      </div>
+    </div>
+
+    <!-- Weather peek -->
+    <div class="peek-card" id="peek-weather">
+      <div class="weather-peek">
+        <div class="weather-now">
+          <div class="weather-big-temp">69°</div>
+          <div class="weather-detail">
+            <div class="weather-condition">Partly cloudy · San Francisco</div>
+            <div class="weather-rain">🌧 Rain in 22 minutes</div>
+          </div>
+        </div>
+        <div class="hourly-row">
+          <div class="hourly-item">
+            <div class="hourly-time">Now</div>
+            <div class="hourly-icon">⛅</div>
+            <div class="hourly-temp">69°</div>
+            <div class="rain-bar-wrap"><div class="rain-bar" style="width:15%"></div></div>
+          </div>
+          <div class="hourly-item">
+            <div class="hourly-time">6AM</div>
+            <div class="hourly-icon">🌧</div>
+            <div class="hourly-temp">67°</div>
+            <div class="rain-bar-wrap"><div class="rain-bar" style="width:75%"></div></div>
+          </div>
+          <div class="hourly-item">
+            <div class="hourly-time">7AM</div>
+            <div class="hourly-icon">🌧</div>
+            <div class="hourly-temp">66°</div>
+            <div class="rain-bar-wrap"><div class="rain-bar" style="width:90%"></div></div>
+          </div>
+          <div class="hourly-item">
+            <div class="hourly-time">8AM</div>
+            <div class="hourly-icon">🌦</div>
+            <div class="hourly-temp">68°</div>
+            <div class="rain-bar-wrap"><div class="rain-bar" style="width:40%"></div></div>
+          </div>
+          <div class="hourly-item">
+            <div class="hourly-time">9AM</div>
+            <div class="hourly-icon">⛅</div>
+            <div class="hourly-temp">71°</div>
+            <div class="rain-bar-wrap"><div class="rain-bar" style="width:10%"></div></div>
+          </div>
+          <div class="hourly-item">
+            <div class="hourly-time">10AM</div>
+            <div class="hourly-icon">☀️</div>
+            <div class="hourly-temp">74°</div>
+            <div class="rain-bar-wrap"><div class="rain-bar" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Markets peek -->
+    <div class="peek-card" id="peek-markets">
+      <div class="markets-peek">
+        <div class="market-row">
+          <span class="market-symbol">BTC</span>
+          <span class="market-price">$84,230</span>
+          <svg class="sparkline" viewBox="0 0 50 20">
+            <polyline points="2,16 8,14 14,10 18,12 24,6 30,8 36,4 42,7 48,4" fill="none" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="market-change up">▲ 2.1%</span>
+        </div>
+        <div class="market-row">
+          <span class="market-symbol">ETH</span>
+          <span class="market-price">$3,841</span>
+          <svg class="sparkline" viewBox="0 0 50 20">
+            <polyline points="2,8 8,10 14,7 18,12 24,9 30,14 36,11 42,13 48,10" fill="none" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="market-change up">▲ 0.8%</span>
+        </div>
+        <div class="market-row">
+          <span class="market-symbol">SPY</span>
+          <span class="market-price">$548.20</span>
+          <svg class="sparkline" viewBox="0 0 50 20">
+            <polyline points="2,10 8,12 14,14 18,11 24,15 30,13 36,16 42,14 48,17" fill="none" stroke="#f87171" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="market-change down">▼ 0.4%</span>
+        </div>
+        <div class="market-row">
+          <span class="market-symbol">SOL</span>
+          <span class="market-price">$142.80</span>
+          <svg class="sparkline" viewBox="0 0 50 20">
+            <polyline points="2,14 8,12 14,8 18,10 24,5 30,7 36,4 42,6 48,3" fill="none" stroke="#4ade80" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="market-change up">▲ 4.3%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- News peek -->
+    <div class="peek-card" id="peek-news">
+      <div class="news-peek">
+        <div class="news-item">
+          <span class="news-num">1</span>
+          <div class="news-text">
+            <div class="news-headline">OpenAI releases o3-mini with 3x faster reasoning at 60% lower cost</div>
+            <div class="news-meta"><span>Hacker News</span><span>14 min ago</span><span>3 min read</span></div>
+          </div>
+        </div>
+        <div class="news-item">
+          <span class="news-num">2</span>
+          <div class="news-text">
+            <div class="news-headline">Apple quietly ships spatial audio update for AirPods Pro 2</div>
+            <div class="news-meta"><span>Techmeme</span><span>28 min ago</span><span>2 min read</span></div>
+          </div>
+        </div>
+        <div class="news-item">
+          <span class="news-num">3</span>
+          <div class="news-text">
+            <div class="news-headline">Show HN: I built a Mac overlay that shows my desktop's nervous system</div>
+            <div class="news-meta"><span>Hacker News</span><span>1 hr ago</span><span>5 min read</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card picker -->
+    <div class="peek-card card-picker" id="peek-picker">
+      <div class="picker-label">Instant — works now</div>
+      <div class="picker-grid">
+        <div class="picker-card added">
+          <span class="picker-icon">⏱</span>
+          <span class="picker-name">Focus</span>
+          <span class="picker-setup instant">✓ Active</span>
+        </div>
+        <div class="picker-card added">
+          <span class="picker-icon">🌤</span>
+          <span class="picker-name">Weather</span>
+          <span class="picker-setup instant">✓ Active</span>
+        </div>
+        <div class="picker-card added">
+          <span class="picker-icon">₿</span>
+          <span class="picker-name">Markets</span>
+          <span class="picker-setup instant">✓ Active</span>
+        </div>
+        <div class="picker-card">
+          <span class="picker-icon">🏀</span>
+          <span class="picker-name">Sports</span>
+          <span class="picker-setup instant">Instant</span>
+        </div>
+        <div class="picker-card added">
+          <span class="picker-icon">📰</span>
+          <span class="picker-name">News</span>
+          <span class="picker-setup instant">✓ Active</span>
+        </div>
+        <div class="picker-card">
+          <span class="picker-icon">🎵</span>
+          <span class="picker-name">Now Playing</span>
+          <span class="picker-setup instant">Instant</span>
+        </div>
+      </div>
+      <div class="picker-label" style="margin-top:4px">10 sec setup — paste a URL</div>
+      <div class="picker-grid">
+        <div class="picker-card">
+          <span class="picker-icon">📅</span>
+          <span class="picker-name">Calendar</span>
+          <span class="picker-setup quick">Paste iCal URL</span>
+        </div>
+        <div class="picker-card">
+          <span class="picker-icon">🚀</span>
+          <span class="picker-name">CI / Deploy</span>
+          <span class="picker-setup quick">Paste webhook</span>
+        </div>
+        <div class="picker-card">
+          <span class="picker-icon">📈</span>
+          <span class="picker-name">Creator Pulse</span>
+          <span class="picker-setup quick">Paste channel URL</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /island -->
+</div><!-- /island-wrap -->
+
+<!-- Command Palette overlay -->
+<div class="overlay" id="overlay" onclick="closePalette()"></div>
+
+<div class="cmd-palette" id="cmdPalette">
+  <div class="cmd-input-wrap">
+    <span class="cmd-icon">⌘</span>
+    <input class="cmd-input" id="cmdInput" placeholder="Search actions…" autofocus>
+  </div>
+  <div class="cmd-results">
+    <div class="cmd-section-label">Focus</div>
+    <div class="cmd-item selected">
+      <div class="cmd-item-icon">⏱</div>
+      <div class="cmd-item-text">
+        <div class="cmd-item-label">Start Focus Session</div>
+        <div class="cmd-item-desc">25 minutes · Deep work</div>
+      </div>
+      <span class="cmd-kbd">Space</span>
+    </div>
+    <div class="cmd-item">
+      <div class="cmd-item-icon">⏸</div>
+      <div class="cmd-item-text">
+        <div class="cmd-item-label">Pause Focus</div>
+        <div class="cmd-item-desc">Current session: 23:41 remaining</div>
+      </div>
+    </div>
+    <div class="cmd-section-label">Island</div>
+    <div class="cmd-item">
+      <div class="cmd-item-icon">🎴</div>
+      <div class="cmd-item-text">
+        <div class="cmd-item-label">Add Card</div>
+        <div class="cmd-item-desc">Calendar, CI, Creator Pulse…</div>
+      </div>
+      <span class="cmd-kbd">+</span>
+    </div>
+    <div class="cmd-item">
+      <div class="cmd-item-icon">⚙️</div>
+      <div class="cmd-item-text">
+        <div class="cmd-item-label">Open Settings</div>
+        <div class="cmd-item-desc">Reorder cards, change shortcuts</div>
+      </div>
+      <span class="cmd-kbd">⌘.</span>
+    </div>
+    <div class="cmd-item">
+      <div class="cmd-item-icon">🌤</div>
+      <div class="cmd-item-text">
+        <div class="cmd-item-label">Set Location</div>
+        <div class="cmd-item-desc">Currently: San Francisco</div>
+      </div>
+    </div>
+    <div class="cmd-section-label">Navigate</div>
+    <div class="cmd-item">
+      <div class="cmd-item-icon">📰</div>
+      <div class="cmd-item-text">
+        <div class="cmd-item-label">Open Top HN Story</div>
+        <div class="cmd-item-desc">OpenAI releases o3-mini…</div>
+      </div>
+      <span class="cmd-kbd">⌘1</span>
+    </div>
+  </div>
+  <div class="cmd-footer">
+    <div class="cmd-hint"><kbd>↑↓</kbd> navigate</div>
+    <div class="cmd-hint"><kbd>↵</kbd> run</div>
+    <div class="cmd-hint"><kbd>esc</kbd> close</div>
+  </div>
+</div>
+
+<!-- Demo controls -->
+<div class="controls">
+  <span class="ctrl-label">State</span>
+  <button class="ctrl-btn active" id="btn-focus" onclick="setState('focus')">🟢 Focus</button>
+  <button class="ctrl-btn" id="btn-meeting" onclick="setState('meeting')">🟡 Meeting soon</button>
+  <button class="ctrl-btn" id="btn-np" onclick="setState('np')">🎵 Now Playing</button>
+  <button class="ctrl-btn" id="btn-idle" onclick="setState('idle')">⚪ Idle</button>
+  <div class="ctrl-divider"></div>
+  <button class="ctrl-btn" onclick="openPalette()">⌘K Palette</button>
+</div>
+
+<script>
+  // ── State ──
+  let currentPeek = null;
+  let currentState = 'focus';
+  let focusSeconds = 23 * 60 + 41;
+  let npVisible = false;
+
+  // ── Focus Timer ──
+  setInterval(() => {
+    if (currentState === 'focus' && focusSeconds > 0) {
+      focusSeconds--;
+      const m = Math.floor(focusSeconds / 60);
+      const s = focusSeconds % 60;
+      document.getElementById('focusTimer').textContent =
+        `${m}:${s.toString().padStart(2, '0')}`;
+
+      // Update ring (25min = 1500s total)
+      const totalSeconds = 25 * 60;
+      const circumference = 69.1;
+      const progress = focusSeconds / totalSeconds;
+      const dashoffset = circumference * (1 - progress);
+      document.getElementById('focusRing').style.strokeDashoffset = dashoffset;
+    }
+  }, 1000);
+
+  // Pulse BTC price
+  setInterval(() => {
+    const base = 84230;
+    const delta = (Math.random() - 0.5) * 40;
+    const price = Math.round(base + delta);
+    document.getElementById('btcPrice').textContent = price.toLocaleString();
+  }, 8000);
+
+  // ── Peek toggle ──
+  function togglePeek(type) {
+    const island = document.getElementById('island');
+
+    if (currentPeek === type) {
+      // Close
+      document.getElementById('peek-' + type).classList.remove('visible');
+      if (type === 'picker') document.getElementById('peek-picker').classList.remove('visible');
+      island.classList.remove('expanded');
+      currentPeek = null;
+      return;
+    }
+
+    // Close any open
+    if (currentPeek) {
+      document.getElementById('peek-' + currentPeek).classList.remove('visible');
+      if (currentPeek === 'picker') document.getElementById('peek-picker').classList.remove('visible');
+    }
+
+    // Open new
+    currentPeek = type;
+    island.classList.add('expanded');
+    const card = document.getElementById('peek-' + type);
+    card.classList.add('visible');
+    if (type === 'picker') card.classList.add('visible');
+  }
+
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    const island = document.getElementById('island');
+    if (!island.contains(e.target) && currentPeek) {
+      document.getElementById('peek-' + currentPeek).classList.remove('visible');
+      island.classList.remove('expanded');
+      currentPeek = null;
+    }
+  });
+
+  // ── State machine ──
+  function setState(state) {
+    currentState = state;
+    const island = document.getElementById('island');
+    const npBlock = document.getElementById('npBlock');
+    const npDivider = document.getElementById('npDivider');
+
+    // Clear state classes
+    island.classList.remove('state-focus', 'state-meeting', 'state-np');
+
+    // Clear active buttons
+    document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+
+    if (state === 'focus') {
+      island.classList.add('state-focus');
+      document.getElementById('btn-focus').classList.add('active');
+      npBlock.classList.remove('visible');
+      npDivider.style.display = 'none';
+      island.style.removeProperty('--np-color');
+      island.style.removeProperty('--np-glow');
+    }
+    else if (state === 'meeting') {
+      island.classList.add('state-meeting');
+      document.getElementById('btn-meeting').classList.add('active');
+      npBlock.classList.remove('visible');
+      npDivider.style.display = 'none';
+    }
+    else if (state === 'np') {
+      island.classList.add('state-np');
+      island.style.setProperty('--np-color', 'rgba(236,72,153,0.45)');
+      island.style.setProperty('--np-glow', 'rgba(236,72,153,0.18)');
+      document.getElementById('btn-np').classList.add('active');
+      npBlock.classList.add('visible');
+      npDivider.style.display = 'block';
+    }
+    else if (state === 'idle') {
+      document.getElementById('btn-idle').classList.add('active');
+      npBlock.classList.remove('visible');
+      npDivider.style.display = 'none';
+    }
+  }
+
+  // ── Command Palette ──
+  function openPalette() {
+    document.getElementById('cmdPalette').classList.add('visible');
+    document.getElementById('overlay').classList.add('visible');
+    setTimeout(() => document.getElementById('cmdInput').focus(), 50);
+  }
+
+  function closePalette() {
+    document.getElementById('cmdPalette').classList.remove('visible');
+    document.getElementById('overlay').classList.remove('visible');
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      openPalette();
+    }
+    if (e.key === 'Escape') closePalette();
+  });
+
+  // Hover hint for island
+  const island = document.getElementById('island');
+  island.addEventListener('mouseenter', () => {
+    // subtle scale
+    island.style.transform = 'scale(1.01)';
+  });
+  island.addEventListener('mouseleave', () => {
+    island.style.transform = '';
+  });
+</script>
+
+</body>
+</html>
