@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Desktop Island — Dev v6 · Unified Design</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
+      background:#0d1117; overflow:hidden; height:100vh; width:100vw; user-select:none;
+    }
+
+    /* ── Menubar ── */
+    .menubar {
+      position:absolute; top:0; left:0; right:0; height:28px;
+      background:rgba(10,12,18,.98); backdrop-filter:blur(20px);
+      display:flex; align-items:center; padding:0 16px; gap:20px;
+      z-index:100; border-bottom:1px solid rgba(255,255,255,.05);
+    }
+    .mb-apple{font-size:13px;color:rgba(255,255,255,.8)}
+    .mb-item{font-size:13px;color:rgba(255,255,255,.4);font-weight:500}
+    .mb-right{margin-left:auto;display:flex;gap:16px;align-items:center}
+    .mb-r{font-size:11px;color:rgba(255,255,255,.3);font-family:'SF Mono',monospace}
+
+    /* ── Design system panel ── */
+    .ds-panel {
+      position:absolute; left:0; top:28px; bottom:0; width:248px;
+      background:rgba(10,12,18,.98); border-right:1px solid rgba(255,255,255,.05);
+      padding:18px 14px; overflow-y:auto; z-index:50;
+    }
+    .ds-panel::-webkit-scrollbar{width:3px}
+    .ds-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.07);border-radius:2px}
+
+    .ds-label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.18);margin-bottom:4px}
+    .ds-rule{height:1px;background:rgba(255,255,255,.05);margin:12px 0}
+
+    .ds-philosophy{
+      font-size:11px;line-height:1.65;color:rgba(255,255,255,.35);
+      padding:10px 11px;background:rgba(255,255,255,.03);border-radius:9px;
+      border:1px solid rgba(255,255,255,.05);margin-bottom:14px;
+    }
+    .ds-philosophy strong{color:rgba(255,255,255,.55);font-weight:600}
+
+    .mode-item{
+      display:flex;gap:10px;align-items:flex-start;
+      padding:9px 10px;border-radius:10px;margin-bottom:6px;
+      cursor:pointer;transition:all .15s;border:1.5px solid transparent;
+    }
+    .mode-item:hover{background:rgba(255,255,255,.03)}
+    .mode-item.selected{border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.04)}
+
+    .mode-dot{
+      width:22px;height:22px;border-radius:50%;flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;font-size:11px;
+      border:1.5px solid;margin-top:1px;
+    }
+    .mode-dot.calm  {border-color:rgba(20,184,166,.4);background:rgba(20,184,166,.08);color:#14b8a6}
+    .mode-dot.queue {border-color:rgba(236,72,153,.4);background:rgba(236,72,153,.08);color:#ec4899}
+    .mode-dot.detail{border-color:rgba(110,216,127,.35);background:rgba(110,216,127,.07);color:#6ed87f}
+    .mode-dot.team  {border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.07);color:#f59e0b}
+
+    .mode-name{font-size:11px;font-weight:700}
+    .calm-c  {color:rgba(20,184,166,.75)}
+    .queue-c {color:rgba(236,72,153,.75)}
+    .detail-c{color:rgba(110,216,127,.75)}
+    .team-c  {color:rgba(245,158,11,.75)}
+
+    .mode-desc{font-size:10px;color:rgba(255,255,255,.28);line-height:1.5;margin-top:3px}
+
+    .intercept-toggle{
+      margin-top:14px; padding:10px 11px;
+      background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);
+      border-radius:10px;
+    }
+    .it-header{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+    .it-dot{width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0}
+    .it-label{font-size:11px;font-weight:700;color:rgba(239,68,68,.75)}
+    .it-tag{margin-left:auto;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 6px;border-radius:20px;background:rgba(239,68,68,.1);color:rgba(239,68,68,.5)}
+    .it-desc{font-size:10px;color:rgba(255,255,255,.28);line-height:1.5}
+
+    /* ── Editor ── */
+    .editor-area{position:absolute;left:248px;right:0;top:28px;bottom:0;display:flex;flex-direction:column}
+    .tabs-bar{height:34px;background:#161b22;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:flex-end;padding:0 8px}
+    .tab{height:30px;padding:0 14px;display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,.35);border-right:1px solid rgba(255,255,255,.04)}
+    .tab.active{background:#0d1117;color:rgba(255,255,255,.7)}
+    .tab-m{width:6px;height:6px;border-radius:50%;background:#e2c97e}
+    .code-body{flex:1;padding:14px 0}
+    .cl{display:flex;font-family:'SF Mono','Menlo',monospace;font-size:12px;line-height:1.85;padding:0 16px 0 48px;position:relative}
+    .ln{position:absolute;left:0;width:40px;text-align:right;color:rgba(255,255,255,.14);font-size:11px;padding-right:10px}
+    .cl.hl{background:rgba(255,255,255,.025)}
+    .kw{color:#ff7b72}.fn{color:#d2a8ff}.str{color:#a5d6ff}.cm{color:rgba(255,255,255,.18)}.tp{color:#79c0ff}.op{color:rgba(255,255,255,.4)}.pl{color:#ffa657}
+
+    /* ═══════════════════════════════════════
+       ISLAND v6 — UNIFIED DESIGN SYSTEM
+    ═══════════════════════════════════════ */
+    .island-wrap{
+      position:absolute; top:36px;
+      left:calc(248px + 50%); transform:translateX(-50%);
+      z-index:1000;
+    }
+
+    .island{
+      position:relative;
+      background:rgba(10,12,18,.96);
+      backdrop-filter:blur(48px) saturate(200%);
+      border-radius:28px;
+      border:1.5px solid rgba(255,255,255,.07);
+      box-shadow:0 8px 48px rgba(0,0,0,.8);
+      overflow:hidden;
+      transition:all .5s cubic-bezier(.34,1.4,.64,1);
+    }
+
+    /* ══════════════════════
+       MODE 1: CALM (organism)
+       Default ambient state
+    ══════════════════════ */
+    #mode-calm{
+      display:flex; align-items:center; gap:14px;
+      padding:11px 18px; position:relative; min-width:300px;
+    }
+
+    .calm-bg{
+      position:absolute;inset:0;
+      background:linear-gradient(135deg,rgba(20,184,166,.06),rgba(96,165,250,.04),rgba(110,216,127,.05));
+      animation:calm-bg 5s ease-in-out infinite;
+    }
+    @keyframes calm-bg{0%,100%{opacity:.7}50%{opacity:1}}
+
+    .calm-core{position:relative;width:28px;height:28px;flex-shrink:0}
+    .calm-ring{
+      position:absolute;inset:0;border-radius:50%;
+      border:1.5px solid rgba(20,184,166,.35);
+      animation:calm-breathe 4.5s ease-in-out infinite;
+    }
+    @keyframes calm-breathe{0%,100%{transform:scale(.8);opacity:.6}50%{transform:scale(1);opacity:1}}
+    .calm-ring-outer{
+      position:absolute;inset:-7px;border-radius:50%;
+      border:1px solid rgba(20,184,166,.1);
+      animation:calm-breathe 4.5s ease-in-out infinite .3s;
+    }
+    .calm-inner{
+      position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    }
+    .calm-dot{width:9px;height:9px;border-radius:50%;background:#14b8a6;animation:calm-breathe 4.5s ease-in-out infinite .1s}
+
+    .calm-wave{display:flex;align-items:center;gap:2.5px;height:22px;width:56px;position:relative;z-index:1}
+    .cw-bar{width:2.5px;border-radius:2px;background:rgba(20,184,166,.45);animation:cw-wave 1.6s ease-in-out infinite}
+    .cw-bar:nth-child(1){height:4px;animation-delay:0s}
+    .cw-bar:nth-child(2){height:9px;animation-delay:.12s}
+    .cw-bar:nth-child(3){height:16px;animation-delay:.24s}
+    .cw-bar:nth-child(4){height:20px;animation-delay:.36s}
+    .cw-bar:nth-child(5){height:14px;animation-delay:.48s}
+    .cw-bar:nth-child(6){height:20px;animation-delay:.6s}
+    .cw-bar:nth-child(7){height:12px;animation-delay:.72s}
+    .cw-bar:nth-child(8){height:7px;animation-delay:.84s}
+    .cw-bar:nth-child(9){height:13px;animation-delay:.96s}
+    @keyframes cw-wave{0%,100%{transform:scaleY(.3);opacity:.35}50%{transform:scaleY(1);opacity:.8}}
+
+    .calm-meta{position:relative;z-index:1;display:flex;flex-direction:column;gap:2px}
+    .calm-session{font-size:12px;font-weight:600;color:rgba(255,255,255,.5);font-family:'SF Mono',monospace}
+    .calm-sub{font-size:10px;color:rgba(20,184,166,.5)}
+
+    .calm-team-btn{
+      margin-left:auto;position:relative;z-index:1;
+      width:26px;height:26px;border-radius:8px;
+      background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
+      display:flex;align-items:center;justify-content:center;
+      font-size:12px;cursor:pointer;transition:background .15s;flex-shrink:0;
+    }
+    .calm-team-btn:hover{background:rgba(255,255,255,.09)}
+
+    /* ══════════════════════
+       MODE 2: QUEUE (mirror)
+       Your turn — items surfaced
+    ══════════════════════ */
+    #mode-queue{display:none}
+
+    .queue-top{
+      display:flex;align-items:center;gap:10px;
+      padding:12px 16px 8px;
+    }
+    .qt-title{font-size:16px;font-weight:800;letter-spacing:-.3px;color:rgba(255,255,255,.85)}
+    .qt-count{
+      font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;
+      background:rgba(236,72,153,.12);color:rgba(236,72,153,.8);
+    }
+    .qt-est{font-size:11px;color:rgba(255,255,255,.3);margin-left:auto}
+    .qt-snooze{
+      font-size:10px;font-weight:600;padding:3px 9px;border-radius:6px;
+      background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+      color:rgba(255,255,255,.35);cursor:pointer;margin-left:8px;transition:all .15s;
+    }
+    .qt-snooze:hover{background:rgba(255,255,255,.09);color:rgba(255,255,255,.6)}
+
+    .queue-items{padding:0 12px 8px;display:flex;flex-direction:column;gap:5px;min-width:420px}
+
+    .qi{
+      display:flex;align-items:flex-start;gap:10px;
+      padding:9px 11px;border-radius:12px;
+      cursor:pointer;transition:all .15s;border:1px solid;
+    }
+    .qi:hover{transform:translateX(3px)}
+    .qi.now   {background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.2)}
+    .qi.soon  {background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.07)}
+    .qi.later {background:rgba(255,255,255,.02);border-color:rgba(255,255,255,.05)}
+    .qi.done  {background:rgba(110,216,127,.04);border-color:rgba(110,216,127,.1);opacity:.55}
+
+    .qi-badge{
+      padding:2px 7px;border-radius:6px;font-size:9px;font-weight:800;
+      text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;margin-top:1px;
+    }
+    .qi-badge.now  {background:rgba(239,68,68,.15);color:rgba(239,68,68,.9)}
+    .qi-badge.soon {background:rgba(255,255,255,.07);color:rgba(255,255,255,.4)}
+    .qi-badge.later{background:rgba(255,255,255,.04);color:rgba(255,255,255,.3)}
+
+    .qi-body{flex:1}
+    .qi-task{font-size:12px;font-weight:600;color:rgba(255,255,255,.72);line-height:1.35;margin-bottom:3px}
+    .qi-task.done-t{text-decoration:line-through;color:rgba(255,255,255,.28)}
+    .qi-meta{font-size:10px;color:rgba(255,255,255,.3);display:flex;gap:10px}
+
+    .qi-time{
+      font-size:10px;font-weight:700;font-family:'SF Mono',monospace;
+      padding:2px 7px;border-radius:6px;flex-shrink:0;white-space:nowrap;
+    }
+    .qi-time.now {background:rgba(239,68,68,.1);color:rgba(239,68,68,.8)}
+    .qi-time.soon{background:rgba(255,255,255,.06);color:rgba(255,255,255,.38)}
+    .qi-time.done{background:rgba(110,216,127,.08);color:rgba(110,216,127,.6)}
+
+    .qi-done-ic{font-size:13px;flex-shrink:0;margin-top:1px}
+
+    .queue-footer{
+      padding:7px 16px 10px;border-top:1px solid rgba(255,255,255,.04);
+      display:flex;align-items:center;gap:8px;
+    }
+    .qf-agent-dot{width:6px;height:6px;border-radius:50%;background:#6ed87f;animation:p-go 2.5s infinite;flex-shrink:0}
+    @keyframes p-go{0%,100%{box-shadow:0 0 0 0 rgba(110,216,127,.5)}50%{box-shadow:0 0 0 4px rgba(110,216,127,0)}}
+    .qf-text{font-size:10.5px;color:rgba(255,255,255,.3)}
+    .qf-text strong{color:rgba(255,255,255,.5)}
+    .qf-detail{
+      margin-left:auto;font-size:10px;font-weight:600;
+      color:rgba(255,255,255,.3);cursor:pointer;transition:color .15s;
+    }
+    .qf-detail:hover{color:rgba(255,255,255,.6)}
+
+    /* ══════════════════════
+       MODE 3: DETAIL
+       On-demand. What's happening.
+    ══════════════════════ */
+    #mode-detail{display:none}
+
+    .detail-header{
+      display:flex;align-items:center;gap:7px;
+      padding:12px 14px 8px; min-width:500px;
+    }
+
+    .sig-pill{display:flex;align-items:center;gap:6px;padding:4px 11px 4px 8px;border-radius:13px;flex-shrink:0}
+    .sp-go  {background:rgba(110,216,127,.1)}
+    .sp-wait{background:rgba(251,191,36,.1)}
+    .sp-rev {background:rgba(210,168,255,.1)}
+    .sp-plan{background:rgba(96,165,250,.1)}
+    .sp-err {background:rgba(255,123,114,.1)}
+
+    .sig-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .sd-go  {background:#6ed87f;animation:p-go 2.5s infinite}
+    .sd-wait{background:#fbbf24;animation:p-amb 1.8s infinite}
+    .sd-rev {background:#d2a8ff}
+    .sd-plan{background:#60a5fa;animation:p-blue 3s infinite}
+    .sd-err {background:#ff7b72;animation:p-red 1.4s infinite}
+    @keyframes p-amb{0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.5)}50%{box-shadow:0 0 0 5px rgba(251,191,36,0)}}
+    @keyframes p-blue{0%,100%{box-shadow:0 0 0 0 rgba(96,165,250,.5)}50%{box-shadow:0 0 0 5px rgba(96,165,250,0)}}
+    @keyframes p-red{0%,100%{box-shadow:0 0 0 0 rgba(255,123,114,.6)}50%{box-shadow:0 0 0 6px rgba(255,123,114,0)}}
+
+    .sig-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+    .sl-go  {color:rgba(110,216,127,.85)}
+    .sl-wait{color:rgba(251,191,36,.85)}
+    .sl-rev {color:rgba(210,168,255,.9)}
+    .sl-plan{color:rgba(96,165,250,.85)}
+    .sl-err {color:rgba(255,123,114,.85)}
+
+    .sess-chip{
+      display:flex;align-items:center;gap:6px;padding:3px 9px;
+      border-radius:9px;background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.06);flex-shrink:0;
+    }
+    .sc-logo{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;background:linear-gradient(135deg,#cc785c,#d4956a);color:#fff}
+    .sc-name{font-size:11px;font-weight:700;color:rgba(255,255,255,.5);font-family:'SF Mono',monospace}
+
+    .detail-action{flex:1;display:flex;align-items:center;gap:7px;padding:3px 8px;border-radius:9px;cursor:pointer;min-width:0;transition:background .15s}
+    .detail-action:hover{background:rgba(255,255,255,.04)}
+    .da-verb{font-size:10px;font-family:'SF Mono',monospace;color:rgba(255,255,255,.27);flex-shrink:0}
+    .da-file{font-size:12px;font-family:'SF Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    .scope-chip{
+      display:flex;align-items:center;gap:6px;padding:4px 9px;
+      border-radius:9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.05);
+      flex-shrink:0;position:relative;cursor:pointer;
+    }
+    .scope-chip:hover .scope-pop{display:block}
+    .sc-count{font-size:12px;font-weight:700;font-family:'SF Mono',monospace}
+    .sc-delta{font-size:9px;font-weight:700;font-family:'SF Mono',monospace}
+    .sc-bar{width:24px;height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
+    .sc-fill{height:100%;border-radius:2px;transition:width .5s ease}
+    .sc-lbl{font-size:8px;color:rgba(255,255,255,.18);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+
+    .scope-pop{
+      display:none;position:absolute;top:calc(100%+8px);left:50%;transform:translateX(-50%);
+      background:rgba(12,14,22,.97);border:1px solid rgba(255,255,255,.1);border-radius:11px;
+      padding:9px;min-width:210px;box-shadow:0 16px 48px rgba(0,0,0,.7);z-index:2000;animation:fi .15s ease;
+    }
+    @keyframes fi{from{opacity:0;transform:translateX(-50%) translateY(-4px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    .sp-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:rgba(255,255,255,.2);margin-bottom:7px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.06)}
+    .sp-row{display:flex;align-items:center;gap:7px;padding:3px 5px;border-radius:5px;margin-bottom:2px}
+    .sp-icon{font-size:10px}
+    .sp-name{font-size:11px;font-family:'SF Mono',monospace;color:rgba(255,255,255,.55);flex:1}
+    .sp-d{font-size:10px;font-family:'SF Mono',monospace}
+    .sp-d.add{color:rgba(110,216,127,.6)}
+
+    .git-chip{
+      display:flex;align-items:center;gap:5px;padding:4px 9px;
+      border-radius:9px;background:rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.05);flex-shrink:0;
+    }
+    .gc-lbl{font-size:9px;color:rgba(255,255,255,.18);font-weight:600}
+    .gc-val{font-size:10px;font-family:'SF Mono',monospace;font-weight:700;color:rgba(110,216,127,.6)}
+
+    .dt-timer{font-size:11px;font-family:'SF Mono',monospace;color:rgba(255,255,255,.2);padding:0 6px;flex-shrink:0}
+
+    .detail-expand{
+      border-top:1px solid rgba(255,255,255,.04);
+      padding:10px 12px;animation:fi .2s ease;
+    }
+    .de-mission{display:flex;gap:9px;padding:8px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.04);border-radius:10px;margin-bottom:8px}
+    .de-mi{font-size:14px;flex-shrink:0;margin-top:1px}
+    .de-task{font-size:11.5px;font-weight:500;color:rgba(255,255,255,.65);line-height:1.4;margin-bottom:3px}
+    .de-meta{font-size:10px;color:rgba(255,255,255,.25);display:flex;gap:10px}
+
+    .de-prog{height:3px;background:rgba(255,255,255,.05);border-radius:2px;margin-bottom:8px;overflow:hidden}
+    .de-fill{height:100%;border-radius:2px;transition:width 1s ease}
+
+    .de-actions{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+    .dea{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:7px;font-family:'SF Mono',monospace;font-size:10.5px}
+    .dea.done{background:rgba(110,216,127,.04)}
+    .dea.run {background:rgba(210,168,255,.05);border:1px solid rgba(210,168,255,.08)}
+    .dea.warn{background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.08)}
+    .dea-ic{flex-shrink:0}
+    .dea-v{color:rgba(255,255,255,.27);width:48px;flex-shrink:0}
+    .dea-p{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .dea-p.g{color:rgba(110,216,127,.7)}.dea-p.p{color:rgba(210,168,255,.7)}
+    .dea-p.a{color:rgba(251,191,36,.7)}.dea-p.r{color:rgba(255,123,114,.75)}
+    .dea-d{color:rgba(255,255,255,.18);flex-shrink:0;font-size:10px}
+
+    .de-btns{display:flex;gap:7px}
+    .dbt{flex:1;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid}
+    .dbt-steer{background:rgba(210,168,255,.07);border-color:rgba(210,168,255,.18);color:rgba(210,168,255,.8)}
+    .dbt-steer:hover{background:rgba(210,168,255,.13)}
+    .dbt-pause{background:rgba(251,191,36,.07);border-color:rgba(251,191,36,.18);color:rgba(251,191,36,.8)}
+    .dbt-roll{background:rgba(255,123,114,.06);border-color:rgba(255,123,114,.14);color:rgba(255,123,114,.7)}
+    .dbt-ship{flex:2;background:rgba(110,216,127,.1);border-color:rgba(110,216,127,.25);color:rgba(110,216,127,.9);font-size:13px;font-weight:700}
+    .dbt-ship:hover{background:rgba(110,216,127,.16)}
+    .dbt-cdmd{background:rgba(251,191,36,.07);border-color:rgba(251,191,36,.18);color:rgba(251,191,36,.75)}
+
+    .back-btn{
+      margin-left:auto;font-size:10px;font-weight:600;
+      color:rgba(255,255,255,.25);cursor:pointer;transition:color .15s;padding:3px 8px;
+      border-radius:6px;border:1px solid rgba(255,255,255,.07);
+    }
+    .back-btn:hover{color:rgba(255,255,255,.55);background:rgba(255,255,255,.04)}
+
+    /* ══════════════════════
+       MODE 4: TEAM (war room)
+    ══════════════════════ */
+    #mode-team{display:none}
+
+    .team-header{
+      display:flex;align-items:center;gap:10px;padding:10px 14px 8px;
+      border-bottom:1px solid rgba(255,255,255,.04);
+    }
+    .th-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:rgba(245,158,11,.65)}
+    .th-stats{display:flex;gap:12px;margin-left:auto}
+    .th-s{font-size:10px;font-family:'SF Mono',monospace}
+    .th-s.ok{color:rgba(110,216,127,.6)}.th-s.warn{color:rgba(251,191,36,.65)}.th-s.err{color:rgba(239,68,68,.65)}
+
+    .team-grid{padding:10px 12px 8px;display:flex;flex-direction:column;gap:5px;min-width:520px}
+
+    .tg-machine{margin-bottom:2px}
+    .tg-machine-lbl{
+      font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;
+      color:rgba(255,255,255,.16);margin-bottom:5px;padding-left:3px;
+      display:flex;align-items:center;gap:8px;
+    }
+    .tg-machine-lbl::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.05)}
+
+    .tg-agents{display:flex;gap:5px}
+
+    .ta{flex:1;padding:7px 9px;border-radius:10px;border:1px solid;cursor:pointer;transition:all .15s;min-width:0}
+    .ta:hover{transform:translateY(-2px)}
+    .ta.go   {background:rgba(110,216,127,.05);border-color:rgba(110,216,127,.18)}
+    .ta.wait {background:rgba(251,191,36,.05);border-color:rgba(251,191,36,.22)}
+    .ta.error{background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.28)}
+    .ta.idle {background:rgba(255,255,255,.02);border-color:rgba(255,255,255,.07)}
+    .ta.plan {background:rgba(96,165,250,.05);border-color:rgba(96,165,250,.15)}
+    .ta.rev  {background:rgba(210,168,255,.05);border-color:rgba(210,168,255,.15)}
+
+    .ta-top{display:flex;align-items:center;gap:5px;margin-bottom:4px}
+    .ta-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+    .go   .ta-dot{background:#6ed87f;animation:p-go 2.5s infinite}
+    .wait .ta-dot{background:#fbbf24;animation:p-amb 1.8s infinite}
+    .error .ta-dot{background:#ef4444;animation:p-red 1.4s infinite}
+    .idle .ta-dot{background:rgba(255,255,255,.2)}
+    .plan .ta-dot{background:#60a5fa;animation:p-blue 2.5s infinite}
+    .rev  .ta-dot{background:#d2a8ff}
+
+    .ta-sig{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}
+    .go   .ta-sig{color:rgba(110,216,127,.75)}
+    .wait .ta-sig{color:rgba(251,191,36,.8)}
+    .error .ta-sig{color:rgba(239,68,68,.8)}
+    .idle .ta-sig{color:rgba(255,255,255,.25)}
+    .plan .ta-sig{color:rgba(96,165,250,.75)}
+    .rev  .ta-sig{color:rgba(210,168,255,.75)}
+
+    .ta-repo{font-size:11px;font-weight:700;font-family:'SF Mono',monospace;color:rgba(255,255,255,.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ta-action{font-size:10px;color:rgba(255,255,255,.28);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+    .go   .ta-action{color:rgba(110,216,127,.55)}
+    .wait .ta-action{color:rgba(251,191,36,.6)}
+    .error .ta-action{color:rgba(239,68,68,.6)}
+    .plan .ta-action{color:rgba(96,165,250,.55)}
+    .rev  .ta-action{color:rgba(210,168,255,.6)}
+
+    .team-footer{border-top:1px solid rgba(255,255,255,.04);padding:7px 14px 9px;display:flex;align-items:center;gap:10px}
+    .tf-txt{font-size:10px;color:rgba(255,255,255,.25)}
+    .tf-focus{margin-left:auto;font-size:11px;font-weight:600;padding:4px 12px;border-radius:7px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.18);color:rgba(245,158,11,.7);cursor:pointer;transition:all .15s}
+    .tf-focus:hover{background:rgba(245,158,11,.14)}
+    .tf-back{font-size:10px;font-weight:600;color:rgba(255,255,255,.25);cursor:pointer;padding:4px 10px;border-radius:6px;border:1px solid rgba(255,255,255,.07);transition:all .15s}
+    .tf-back:hover{color:rgba(255,255,255,.55);background:rgba(255,255,255,.04)}
+
+    /* Trust badge */
+    .trust-b{
+      position:absolute;bottom:-11px;right:14px;
+      display:flex;align-items:center;gap:5px;padding:2px 8px;
+      background:rgba(10,12,18,.96);border:1px solid rgba(255,255,255,.07);border-radius:20px;cursor:pointer;
+    }
+    .trust-b:hover .trust-tip{display:block}
+    .trust-icon{font-size:9px;color:rgba(255,255,255,.22)}
+    .trust-txt{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:rgba(255,255,255,.18)}
+    .trust-tip{
+      display:none;position:absolute;bottom:calc(100%+8px);right:0;
+      background:rgba(12,14,22,.97);border:1px solid rgba(255,255,255,.1);border-radius:10px;
+      padding:10px 12px;min-width:220px;font-size:11px;color:rgba(255,255,255,.55);line-height:1.6;
+      z-index:3000;box-shadow:0 12px 40px rgba(0,0,0,.7);animation:fi .15s ease;white-space:normal;
+    }
+    .trust-tip strong{color:rgba(255,255,255,.8);display:block;margin-bottom:4px}
+    .tr{display:flex;gap:6px;margin-bottom:2px}
+    .tr-d{color:rgba(110,216,127,.6);flex-shrink:0}
+
+    /* ── Controls ── */
+    .controls{
+      position:fixed;bottom:16px;
+      left:calc(248px + 50%);transform:translateX(-50%);
+      background:rgba(10,12,18,.97);backdrop-filter:blur(20px);
+      border-radius:12px;border:1px solid rgba(255,255,255,.07);
+      padding:8px 14px;display:flex;gap:7px;z-index:500;align-items:center;
+    }
+    .ctrl-l{font-size:9px;color:rgba(255,255,255,.18);text-transform:uppercase;letter-spacing:.5px}
+    .cbtn{
+      padding:5px 11px;border-radius:7px;background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.07);color:rgba(255,255,255,.4);
+      font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;
+      transition:all .15s;white-space:nowrap;
+    }
+    .cbtn:hover{background:rgba(255,255,255,.09);color:rgba(255,255,255,.7)}
+    .cbtn.calm-a  {background:rgba(20,184,166,.1);border-color:rgba(20,184,166,.25);color:#14b8a6}
+    .cbtn.queue-a {background:rgba(236,72,153,.1);border-color:rgba(236,72,153,.25);color:#ec4899}
+    .cbtn.detail-a{background:rgba(110,216,127,.1);border-color:rgba(110,216,127,.25);color:#6ed87f}
+    .cbtn.team-a  {background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.25);color:#f59e0b}
+    .cdiv{width:1px;height:17px;background:rgba(255,255,255,.07)}
+  </style>
+</head>
+<body>
+
+<!-- Menubar -->
+<div class="menubar">
+  <span class="mb-apple">&#xF8FF;</span>
+  <span class="mb-item" style="font-weight:700;color:rgba(255,255,255,.8)">Code</span>
+  <span class="mb-item">File</span><span class="mb-item">View</span><span class="mb-item">Terminal</span>
+  <div class="mb-right">
+    <span class="mb-r">feat/auth ⎇</span>
+    <span class="mb-r">17:02</span>
+  </div>
+</div>
+
+<!-- Design system panel -->
+<div class="ds-panel">
+  <div class="ds-label">Design system — v6</div>
+
+  <div class="ds-rule"></div>
+
+  <div class="ds-philosophy">
+    <strong>Ambient by default. Speaks when you need to act.</strong><br>
+    The island doesn't show you what Claude is doing. It shows you what <em>you</em> need to do — and only when that changes.
+  </div>
+
+  <div class="ds-label" style="margin-bottom:10px">Four modes</div>
+
+  <div class="mode-item selected" id="tab-calm" onclick="setMode('calm')">
+    <div class="mode-dot calm">◉</div>
+    <div>
+      <div class="mode-name calm-c">CALM</div>
+      <div class="mode-desc">Default state. Session is healthy, nothing needs you. Breathing organism. Barely there.</div>
+    </div>
+  </div>
+
+  <div class="mode-item" id="tab-queue" onclick="setMode('queue')">
+    <div class="mode-dot queue">↑</div>
+    <div>
+      <div class="mode-name queue-c">QUEUE</div>
+      <div class="mode-desc">Your turn. Items need attention — approvals, reviews, decisions. Claude is a footnote.</div>
+    </div>
+  </div>
+
+  <div class="mode-item" id="tab-detail" onclick="setMode('detail')">
+    <div class="mode-dot detail">●</div>
+    <div>
+      <div class="mode-name detail-c">DETAIL</div>
+      <div class="mode-desc">On-demand. What is Claude actually doing? Tap to see scope, actions, git, buttons.</div>
+    </div>
+  </div>
+
+  <div class="mode-item" id="tab-team" onclick="setMode('team')">
+    <div class="mode-dot team">⊞</div>
+    <div>
+      <div class="mode-name team-c">TEAM</div>
+      <div class="mode-desc">Zoom out. All agents across all machines. Errors surface immediately.</div>
+    </div>
+  </div>
+
+  <div class="ds-rule"></div>
+
+  <div class="intercept-toggle">
+    <div class="it-header">
+      <div class="it-dot"></div>
+      <span class="it-label">INTERCEPT mode</span>
+      <span class="it-tag">power</span>
+    </div>
+    <div class="it-desc">Gate every tool call before execution. Opt-in for security / infra contexts. Replaces CALM with a live veto queue.</div>
+  </div>
+</div>
+
+<!-- Editor -->
+<div class="editor-area">
+  <div class="tabs-bar">
+    <div class="tab">auth.service.ts <span class="tab-m"></span></div>
+    <div class="tab active">refresh.handler.ts <span class="tab-m"></span></div>
+    <div class="tab">auth.spec.ts</div>
+  </div>
+  <div class="code-body">
+    <div class="cl"><span class="ln">1</span><span class="kw">import</span> <span class="op">{ </span><span class="tp">Injectable</span><span class="op"> }</span> <span class="kw">from</span> <span class="str">'@nestjs/common'</span><span class="op">;</span></div>
+    <div class="cl"><span class="ln">2</span><span class="kw">import</span> <span class="op">{ </span><span class="tp">JwtService</span><span class="op"> }</span> <span class="kw">from</span> <span class="str">'@nestjs/jwt'</span><span class="op">;</span></div>
+    <div class="cl"><span class="ln">3</span><span class="cm">// Claude writing token rotation — island in QUEUE mode</span></div>
+    <div class="cl"><span class="ln">4</span></div>
+    <div class="cl hl"><span class="ln">5</span><span class="op">@</span><span class="fn">Injectable</span><span class="op">()</span></div>
+    <div class="cl hl"><span class="ln">6</span><span class="kw">export class</span> <span class="tp">RefreshHandler</span> <span class="op">{</span></div>
+    <div class="cl"><span class="ln">7</span>  <span class="kw">constructor</span><span class="op">(</span><span class="kw">private</span> <span class="pl">jwtService</span><span class="op">:</span> <span class="tp">JwtService</span><span class="op">) {}</span></div>
+    <div class="cl hl"><span class="ln">8</span>  <span class="kw">async</span> <span class="fn">rotate</span><span class="op">(</span><span class="pl">token</span><span class="op">:</span> <span class="kw">string</span><span class="op">) {</span></div>
+    <div class="cl"><span class="ln">9</span>    <span class="cm">// ▌ writing...</span></div>
+    <div class="cl"><span class="ln">10</span>  <span class="op">}</span></div>
+    <div class="cl"><span class="ln">11</span><span class="op">}</span></div>
+  </div>
+</div>
+
+<!-- ═══════ ISLAND v6 ═══════ -->
+<div class="island-wrap">
+  <div class="island" id="island">
+
+    <!-- MODE 1: CALM -->
+    <div id="mode-calm">
+      <div class="calm-bg"></div>
+      <div style="display:flex;align-items:center;gap:14px;padding:11px 18px;position:relative;z-index:1">
+        <div class="calm-core">
+          <div class="calm-ring-outer"></div>
+          <div class="calm-ring"></div>
+          <div class="calm-inner"><div class="calm-dot"></div></div>
+        </div>
+        <div class="calm-wave">
+          <div class="cw-bar"></div><div class="cw-bar"></div><div class="cw-bar"></div>
+          <div class="cw-bar"></div><div class="cw-bar"></div><div class="cw-bar"></div>
+          <div class="cw-bar"></div><div class="cw-bar"></div><div class="cw-bar"></div>
+        </div>
+        <div class="calm-meta">
+          <div class="calm-session">auth-system · 22:14</div>
+          <div class="calm-sub">running · 5 files · healthy</div>
+        </div>
+        <div class="calm-team-btn" onclick="setMode('team')" title="Team view">⊞</div>
+      </div>
+    </div>
+
+    <!-- MODE 2: QUEUE -->
+    <div id="mode-queue">
+      <div class="queue-top">
+        <span class="qt-title">Your turn</span>
+        <span class="qt-count">3 items</span>
+        <span class="qt-est">est. 12 min</span>
+        <span class="qt-snooze">Snooze to end ↷</span>
+      </div>
+      <div class="queue-items">
+        <div class="qi now">
+          <span class="qi-badge now">NOW</span>
+          <div class="qi-body">
+            <div class="qi-task">Approve: ok to overwrite auth.service.ts?</div>
+            <div class="qi-meta"><span>Claude is blocked · auth-system</span></div>
+          </div>
+          <span class="qi-time now">Claude blocked</span>
+        </div>
+        <div class="qi soon">
+          <span class="qi-badge soon">5 MIN</span>
+          <div class="qi-body">
+            <div class="qi-task">Review: jwt.middleware.ts — +84 lines added</div>
+            <div class="qi-meta"><span>Scope on track</span><span>5 min read</span></div>
+          </div>
+          <span class="qi-time soon">5 min</span>
+        </div>
+        <div class="qi later">
+          <span class="qi-badge later">LATER</span>
+          <div class="qi-body">
+            <div class="qi-task">Decision: Redis or in-memory session store?</div>
+            <div class="qi-meta"><span>Needed before auth.service.ts completes</span></div>
+          </div>
+          <span class="qi-time soon">7 min</span>
+        </div>
+        <div class="qi done">
+          <span class="qi-done-ic">✅</span>
+          <div class="qi-body">
+            <div class="qi-task done-t">Reviewed auth.spec.ts</div>
+            <div class="qi-meta"><span>Done 4m ago</span></div>
+          </div>
+          <span class="qi-time done">Done</span>
+        </div>
+      </div>
+      <div class="queue-footer">
+        <div class="qf-agent-dot"></div>
+        <div class="qf-text">Claude is <strong>running</strong> on refresh.handler.ts while you work</div>
+        <div class="qf-detail" onclick="setMode('detail')">See detail →</div>
+      </div>
+    </div>
+
+    <!-- MODE 3: DETAIL -->
+    <div id="mode-detail">
+      <div class="detail-header">
+        <div class="sig-pill sp-go">
+          <div class="sig-dot sd-go"></div>
+          <span class="sig-lbl sl-go">GO</span>
+        </div>
+        <div class="sess-chip">
+          <div class="sc-logo">C</div>
+          <span class="sc-name">auth-system</span>
+        </div>
+        <div class="detail-action">
+          <span class="da-verb">writing</span>
+          <span class="da-file" style="color:rgba(110,216,127,.75)">refresh.handler.ts</span>
+        </div>
+        <div class="scope-chip">
+          <div style="display:flex;flex-direction:column;gap:1px">
+            <div class="sc-count" style="color:rgba(110,216,127,.75)">5</div>
+            <div class="sc-delta" style="color:rgba(255,255,255,.2)">on track</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <div class="sc-bar"><div class="sc-fill" style="width:33%;background:rgba(110,216,127,.55)"></div></div>
+            <div class="sc-lbl">scope</div>
+          </div>
+          <div class="scope-pop">
+            <div class="sp-title">Files touched</div>
+            <div class="sp-row"><span class="sp-icon">📝</span><span class="sp-name">auth.service.ts</span><span class="sp-d add">+12</span></div>
+            <div class="sp-row"><span class="sp-icon">📝</span><span class="sp-name">jwt.middleware.ts</span><span class="sp-d add">+84</span></div>
+            <div class="sp-row"><span class="sp-icon">🆕</span><span class="sp-name">auth.spec.ts</span><span class="sp-d add">+88</span></div>
+            <div class="sp-row"><span class="sp-icon">✏️</span><span class="sp-name">refresh.handler.ts</span><span class="sp-d add">…</span></div>
+          </div>
+        </div>
+        <div class="git-chip"><span class="gc-lbl">↩</span><span class="gc-val">safe</span></div>
+        <div class="dt-timer">22:14</div>
+        <div class="back-btn" onclick="setMode('queue')">← Queue</div>
+      </div>
+      <div class="detail-expand">
+        <div class="de-mission">
+          <div class="de-mi">⚡</div>
+          <div>
+            <div class="de-task">Build JWT auth with refresh token rotation + session revocation</div>
+            <div class="de-meta"><span>🕐 22:14</span><span>📁 5 files</span><span>↩ committed 4m ago</span></div>
+          </div>
+        </div>
+        <div class="de-prog"><div class="de-fill" style="width:65%;background:linear-gradient(90deg,rgba(110,216,127,.4),rgba(110,216,127,.7))"></div></div>
+        <div class="de-actions">
+          <div class="dea done"><span class="dea-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="dea-v">write</span><span class="dea-p g">jwt.middleware.ts</span><span class="dea-d">+84</span></div>
+          <div class="dea done"><span class="dea-ic" style="color:rgba(110,216,127,.6)">✓</span><span class="dea-v">write</span><span class="dea-p g">auth.spec.ts</span><span class="dea-d">+88</span></div>
+          <div class="dea run"><span class="dea-ic" style="color:#d2a8ff">◆</span><span class="dea-v">write</span><span class="dea-p p">refresh.handler.ts</span><span class="dea-d" style="color:#d2a8ff">…</span></div>
+        </div>
+        <div class="de-btns">
+          <div class="dbt dbt-steer">✦ Steer</div>
+          <div class="dbt dbt-pause">⏸ Pause</div>
+          <div class="dbt dbt-roll">↩ Rollback</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODE 4: TEAM -->
+    <div id="mode-team">
+      <div class="team-header">
+        <span class="th-title">⚡ Team · 6 agents</span>
+        <div class="th-stats">
+          <span class="th-s ok">4 GO</span>
+          <span class="th-s warn">1 WAIT</span>
+          <span class="th-s err">1 ERROR</span>
+        </div>
+      </div>
+      <div class="team-grid">
+        <div class="tg-machine">
+          <div class="tg-machine-lbl">macs164 · Hiten</div>
+          <div class="tg-agents">
+            <div class="ta go"><div class="ta-top"><div class="ta-dot"></div><span class="ta-sig">GO</span></div><div class="ta-repo">auth-system</div><div class="ta-action">writing handler.ts</div></div>
+            <div class="ta wait"><div class="ta-top"><div class="ta-dot"></div><span class="ta-sig">WAIT</span></div><div class="ta-repo">frontend-app</div><div class="ta-action">overwrite Login.tsx?</div></div>
+          </div>
+        </div>
+        <div class="tg-machine">
+          <div class="tg-machine-lbl">Bob · DO</div>
+          <div class="tg-agents">
+            <div class="ta error"><div class="ta-top"><div class="ta-dot"></div><span class="ta-sig">ERROR</span></div><div class="ta-repo">data-pipeline</div><div class="ta-action">TypeError: undefined</div></div>
+            <div class="ta go"><div class="ta-top"><div class="ta-dot"></div><span class="ta-sig">GO</span></div><div class="ta-repo">api-gateway</div><div class="ta-action">writing routes.ts</div></div>
+          </div>
+        </div>
+        <div class="tg-machine">
+          <div class="tg-machine-lbl">macs8256 · Kar</div>
+          <div class="tg-agents">
+            <div class="ta rev"><div class="ta-top"><div class="ta-dot"></div><span class="ta-sig">REVIEW</span></div><div class="ta-repo">billing-service</div><div class="ta-action">✓ ready to ship</div></div>
+            <div class="ta go"><div class="ta-top"><div class="ta-dot"></div><span class="ta-sig">GO</span></div><div class="ta-repo">worker-jobs</div><div class="ta-action">writing queue.ts</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="team-footer">
+        <span class="tf-txt">ERROR on Bob · data-pipeline needs attention</span>
+        <div class="tf-focus">Focus →</div>
+        <div class="tf-back" onclick="setMode('calm')">← Back</div>
+      </div>
+    </div>
+
+  </div><!-- /island -->
+
+  <!-- Trust badge -->
+  <div class="trust-b">
+    <span class="trust-icon">🔒</span>
+    <span class="trust-txt">local-only · open source</span>
+    <div class="trust-tip">
+      <strong>How it works</strong>
+      <div class="tr"><span class="tr-d">✓</span>Reads only: pgrep + git status</div>
+      <div class="tr"><span class="tr-d">✓</span>No network calls, no telemetry</div>
+      <div class="tr"><span class="tr-d">✓</span>All data stays on your machine</div>
+      <div class="tr"><span class="tr-d">✓</span>Open source — verify the source</div>
+    </div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <span class="ctrl-l">Mode</span>
+  <button class="cbtn calm-a" id="cb-calm"   onclick="setMode('calm')">◉ Calm</button>
+  <button class="cbtn" id="cb-queue"          onclick="setMode('queue')">↑ Queue</button>
+  <button class="cbtn" id="cb-detail"         onclick="setMode('detail')">● Detail</button>
+  <button class="cbtn" id="cb-team"           onclick="setMode('team')">⊞ Team</button>
+  <div class="cdiv"></div>
+  <span class="ctrl-l">Queue state</span>
+  <button class="cbtn" onclick="setQueueState('busy')">Busy (3 items)</button>
+  <button class="cbtn" onclick="setQueueState('single')">Urgent (1 NOW)</button>
+  <button class="cbtn" onclick="setQueueState('empty')">Empty → Calm</button>
+</div>
+
+<script>
+  let currentMode = 'calm';
+
+  function setMode(m) {
+    currentMode = m;
+    ['calm','queue','detail','team'].forEach(id => {
+      document.getElementById('mode-'+id).style.display = 'none';
+    });
+    document.getElementById('mode-'+m).style.display = 'block';
+
+    // Update island border / shadow
+    const island = document.getElementById('island');
+    island.style.borderColor = {
+      calm:   'rgba(20,184,166,.3)',
+      queue:  'rgba(236,72,153,.35)',
+      detail: 'rgba(110,216,127,.25)',
+      team:   'rgba(245,158,11,.2)',
+    }[m];
+    island.style.boxShadow = {
+      calm:   '0 8px 48px rgba(0,0,0,.8), 0 0 28px rgba(20,184,166,.07)',
+      queue:  '0 8px 48px rgba(0,0,0,.8), 0 0 32px rgba(236,72,153,.1)',
+      detail: '0 8px 48px rgba(0,0,0,.8), 0 0 24px rgba(110,216,127,.07)',
+      team:   '0 8px 48px rgba(0,0,0,.9), 0 0 30px rgba(245,158,11,.06)',
+    }[m];
+
+    // Update tabs
+    ['calm','queue','detail','team'].forEach(id => {
+      document.getElementById('tab-'+id).classList.toggle('selected', id===m);
+      const cb = document.getElementById('cb-'+id);
+      if(cb) {
+        cb.className = 'cbtn';
+        if(id===m) cb.classList.add(id+'-a');
+      }
+    });
+  }
+
+  function setQueueState(s) {
+    if(s==='empty') { setMode('calm'); return; }
+    setMode('queue');
+    const items = document.querySelector('.queue-items');
+    if(s==='single') {
+      items.innerHTML = `
+        <div class="qi now">
+          <span class="qi-badge now">NOW</span>
+          <div class="qi-body">
+            <div class="qi-task">Approve: ok to overwrite auth.service.ts?</div>
+            <div class="qi-meta"><span>Claude is blocked · auth-system</span></div>
+          </div>
+          <span class="qi-time now">Claude blocked</span>
+        </div>`;
+      document.querySelector('.qt-count').textContent = '1 item';
+      document.querySelector('.qt-est').textContent = 'est. 1 min';
+    } else {
+      items.innerHTML = `
+        <div class="qi now">
+          <span class="qi-badge now">NOW</span>
+          <div class="qi-body"><div class="qi-task">Approve: ok to overwrite auth.service.ts?</div><div class="qi-meta"><span>Claude is blocked · auth-system</span></div></div>
+          <span class="qi-time now">Claude blocked</span>
+        </div>
+        <div class="qi soon">
+          <span class="qi-badge soon">5 MIN</span>
+          <div class="qi-body"><div class="qi-task">Review: jwt.middleware.ts — +84 lines added</div><div class="qi-meta"><span>Scope on track</span><span>5 min read</span></div></div>
+          <span class="qi-time soon">5 min</span>
+        </div>
+        <div class="qi later">
+          <span class="qi-badge later">LATER</span>
+          <div class="qi-body"><div class="qi-task">Decision: Redis or in-memory session store?</div><div class="qi-meta"><span>Needed before auth.service.ts completes</span></div></div>
+          <span class="qi-time soon">7 min</span>
+        </div>
+        <div class="qi done">
+          <span class="qi-done-ic">✅</span>
+          <div class="qi-body"><div class="qi-task done-t">Reviewed auth.spec.ts</div><div class="qi-meta"><span>Done 4m ago</span></div></div>
+          <span class="qi-time done">Done</span>
+        </div>`;
+      document.querySelector('.qt-count').textContent = '3 items';
+      document.querySelector('.qt-est').textContent = 'est. 12 min';
+    }
+  }
+
+  // Waveform
+  setInterval(() => {
+    if(currentMode!=='calm') return;
+    document.querySelectorAll('.cw-bar').forEach(b => {
+      const h = Math.floor(Math.random()*18)+3;
+      b.style.height = h+'px';
+    });
+  }, 250);
+
+  // Init
+  setMode('calm');
+</script>
+
+</body>
+</html>
